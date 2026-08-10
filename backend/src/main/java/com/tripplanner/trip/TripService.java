@@ -1,6 +1,10 @@
 package com.tripplanner.trip;
 
+import com.tripplanner.ai.dto.GeneratedActivity;
+import com.tripplanner.ai.dto.GeneratedDay;
+import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.exception.TripNotFoundException;
+import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.ItineraryItemRequest;
 import com.tripplanner.trip.dto.TripDayRequest;
 import com.tripplanner.trip.dto.TripRequest;
@@ -9,9 +13,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Business logic for trips.
@@ -75,6 +84,47 @@ public class TripService {
         return tripRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(TripResponse::from)
                 .toList();
+    }
+
+    /** Maximum number of itinerary days generated from a date range. */
+    private static final int MAX_GENERATED_DAYS = 31;
+
+    /**
+     * Persists a trip from a Gemini-generated itinerary. Days are created for
+     * every date in the requested range; activities are attached to the day
+     * matching their day number (activities for out-of-range days are dropped).
+     */
+    @Transactional
+    public TripResponse persistGeneratedItinerary(Long userId, GenerateTripRequest request,
+                                                  GeneratedItinerary itinerary) {
+        long requestedDays = ChronoUnit.DAYS.between(request.startDate(), request.endDate()) + 1;
+        int dayCount = (int) Math.min(requestedDays, MAX_GENERATED_DAYS);
+
+        Trip trip = new Trip(userId, "AI itinerary for " + request.destination().trim(),
+                request.destination().trim(), request.startDate(), request.endDate(),
+                request.travelers(), request.budget(), request.travelStyle().trim());
+        trip.setInterests(sanitizeInterests(request.interests()));
+
+        Map<Integer, List<GeneratedActivity>> activitiesByDay = itinerary.days().stream()
+                .filter(day -> day.day() != null)
+                .collect(Collectors.toMap(GeneratedDay::day, GeneratedDay::activities,
+                        (first, second) -> first, LinkedHashMap::new));
+
+        for (int dayNumber = 1; dayNumber <= dayCount; dayNumber++) {
+            LocalDate date = request.startDate().plusDays(dayNumber - 1L);
+            TripDay day = new TripDay(dayNumber, date);
+            int order = 1;
+            for (GeneratedActivity activity : activitiesByDay.getOrDefault(dayNumber, List.of())) {
+                if (activity.name() == null || activity.name().isBlank()) {
+                    continue;
+                }
+                day.addItem(new ItineraryItem(activity.name().trim(), null,
+                        activity.latitude(), activity.longitude(),
+                        activity.estimatedCost(), activity.duration(), order++));
+            }
+            trip.addDay(day);
+        }
+        return TripResponse.from(tripRepository.save(trip));
     }
 
     // --- Day / item management ----------------------------------------------

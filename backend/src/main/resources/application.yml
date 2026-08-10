@@ -24,6 +24,21 @@ app:
     secret: ${JWT_SECRET:TonncSZLaN4gggtvHuzDet44Uh6YSTF20h12GnSPcmIjow5hdkJDR7CCGE9k4Ta9}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
+  # Per-user rate limiting for AI itinerary generation (token bucket).
+  rate-limit:
+    generate:
+      capacity: 3
+      refill-per-minute: 1
+
+# Google Gemini (Generative Language API). The API key is read exclusively
+# from the GEMINI_API_KEY environment variable — never hardcode it.
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  # gemini-flash-latest always resolves to the newest Flash model; override via GEMINI_MODEL.
+  model: ${GEMINI_MODEL:gemini-flash-latest}
+  base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+  timeout-ms: ${GEMINI_TIMEOUT_MS:60000}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

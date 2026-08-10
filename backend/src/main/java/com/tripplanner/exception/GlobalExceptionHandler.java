@@ -66,6 +66,18 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
     }
 
+    @ExceptionHandler(ItineraryGenerationException.class)
+    public ResponseEntity<ApiError> handleItineraryGeneration(ItineraryGenerationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiError.of(HttpStatus.BAD_GATEWAY, ex.getMessage()));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimit(RateLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
+    }
+
     /**
      * Safety net for the (rare) concurrent-duplicate-registration race where
      * the unique constraint fires before {@link EmailAlreadyExistsException}.

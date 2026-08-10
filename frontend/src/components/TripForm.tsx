@@ -12,6 +12,10 @@ interface TripFormProps {
   initial?: Trip | null
   submitLabel: string
   onSubmit: (input: TripInput) => Promise<void>
+  /** When provided, a primary "Generate My Trip" button is shown alongside the submit button. */
+  onGenerate?: (input: TripInput) => Promise<void>
+  /** True while an AI generation is in flight (disables all buttons). */
+  generating?: boolean
 }
 
 const inputClass =
@@ -19,7 +23,7 @@ const inputClass =
 
 const labelClass = 'mt-4 block text-sm font-medium text-slate-700'
 
-export default function TripForm({ initial, submitLabel, onSubmit }: TripFormProps) {
+export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, generating }: TripFormProps) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [destination, setDestination] = useState(initial?.destination ?? '')
   const [startDate, setStartDate] = useState(initial?.startDate ?? '')
@@ -40,51 +44,67 @@ export default function TripForm({ initial, submitLabel, onSubmit }: TripFormPro
     )
   }
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError(null)
-
+  const buildInput = (): TripInput | null => {
     if (!destination.trim()) {
       setError('Destination is required')
-      return
+      return null
     }
     if (!startDate || !endDate) {
       setError('Start and end dates are required')
-      return
+      return null
     }
     if (startDate > endDate) {
       setError('End date must be on or after the start date')
-      return
+      return null
     }
     const travelersNum = Number(travelers)
     const budgetNum = Number(budget)
     if (!Number.isFinite(travelersNum) || travelersNum < 1) {
       setError('Travelers must be at least 1')
-      return
+      return null
     }
     if (!Number.isFinite(budgetNum) || budgetNum <= 0) {
       setError('Budget must be greater than zero')
-      return
+      return null
     }
+    setError(null)
+    return {
+      title: title.trim() || `Trip to ${destination.trim()}`,
+      destination: destination.trim(),
+      startDate,
+      endDate,
+      travelers: travelersNum,
+      budget: budgetNum,
+      travelStyle,
+      interests,
+    }
+  }
 
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const input = buildInput()
+    if (!input) return
     setSubmitting(true)
     try {
-      await onSubmit({
-        title: title.trim() || `Trip to ${destination.trim()}`,
-        destination: destination.trim(),
-        startDate,
-        endDate,
-        travelers: travelersNum,
-        budget: budgetNum,
-        travelStyle,
-        interests,
-      })
+      await onSubmit(input)
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save the trip. Please try again.'))
     } finally {
       setSubmitting(false)
     }
   }
+
+  const handleGenerate = async () => {
+    const input = buildInput()
+    if (!input || !onGenerate) return
+    try {
+      await onGenerate(input)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not generate the trip. Please try again.'))
+    }
+  }
+
+  const disabled = submitting || generating
 
   return (
     <form onSubmit={handleSubmit}>
@@ -227,13 +247,29 @@ export default function TripForm({ initial, submitLabel, onSubmit }: TripFormPro
         </div>
       </fieldset>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {submitting ? 'Saving…' : submitLabel}
-      </button>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        {onGenerate && (
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={disabled}
+            className="flex-1 rounded-lg bg-gradient-to-r from-indigo-600 to-sky-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:from-indigo-700 hover:to-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generating ? 'Generating…' : '✨ Generate My Trip'}
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={disabled}
+          className={`rounded-lg py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+            onGenerate
+              ? 'flex-1 border border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              : 'w-full bg-indigo-600 text-white hover:bg-indigo-700'
+          }`}
+        >
+          {submitting ? 'Saving…' : submitLabel}
+        </button>
+      </div>
     </form>
   )
 }

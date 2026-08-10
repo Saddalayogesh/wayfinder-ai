@@ -1,5 +1,10 @@
 package com.tripplanner.trip;
 
+import com.tripplanner.ai.GeminiService;
+import com.tripplanner.ai.dto.GeneratedItinerary;
+import com.tripplanner.common.RateLimiter;
+import com.tripplanner.exception.RateLimitExceededException;
+import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.ItineraryItemRequest;
 import com.tripplanner.trip.dto.TripDayRequest;
 import com.tripplanner.trip.dto.TripRequest;
@@ -40,9 +45,37 @@ import java.util.List;
 public class TripController {
 
     private final TripService tripService;
+    private final GeminiService geminiService;
+    private final RateLimiter rateLimiter;
 
-    public TripController(TripService tripService) {
+    public TripController(TripService tripService, GeminiService geminiService, RateLimiter rateLimiter) {
         this.tripService = tripService;
+        this.geminiService = geminiService;
+        this.rateLimiter = rateLimiter;
+    }
+
+    @PostMapping("/generate")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Generate an AI itinerary with Gemini",
+            description = "Sends the trip parameters to Gemini and persists the returned trip with its days and items. "
+                    + "Per-user rate limited; Gemini failures return 502.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Itinerary generated and trip persisted",
+                    content = @Content(schema = @Schema(implementation = TripResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "429", description = "Rate limit exceeded"),
+            @ApiResponse(responseCode = "502", description = "Gemini failed, timed out, or returned an unusable response")
+    })
+    public TripResponse generate(@Valid @RequestBody GenerateTripRequest request,
+                                 Authentication authentication) {
+        Long userId = currentUserId(authentication);
+        if (!rateLimiter.tryAcquire(userId)) {
+            throw new RateLimitExceededException(
+                    "AI generation limit reached. Please try again in a few minutes.");
+        }
+        GeneratedItinerary itinerary = geminiService.generateItinerary(request);
+        return tripService.persistGeneratedItinerary(userId, request, itinerary);
     }
 
     @PostMapping

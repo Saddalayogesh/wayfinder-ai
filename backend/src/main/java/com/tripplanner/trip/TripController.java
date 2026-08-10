@@ -5,6 +5,7 @@ import com.tripplanner.ai.dto.GeneratedActivity;
 import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.common.RateLimiter;
 import com.tripplanner.exception.RateLimitExceededException;
+import com.tripplanner.export.PdfExportService;
 import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.ItineraryItemRequest;
 import com.tripplanner.trip.dto.RegenerateDayRequest;
@@ -21,6 +22,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -50,15 +53,33 @@ public class TripController {
     private final TripService tripService;
     private final GeminiService geminiService;
     private final RateLimiter rateLimiter;
+    private final PdfExportService pdfExportService;
 
-    public TripController(TripService tripService, GeminiService geminiService, RateLimiter rateLimiter) {
+    public TripController(TripService tripService, GeminiService geminiService, RateLimiter rateLimiter,
+                          PdfExportService pdfExportService) {
         this.tripService = tripService;
         this.geminiService = geminiService;
         this.rateLimiter = rateLimiter;
+        this.pdfExportService = pdfExportService;
     }
 
     @PostMapping("/generate")
     @ResponseStatus(HttpStatus.CREATED)
+    @Tag(name = "AI", description = "Gemini-powered itinerary generation")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = GenerateTripRequest.class),
+                    examples = @ExampleObject(name = "generate", value = """
+                            {
+                              "destination": "Kyoto",
+                              "startDate": "2026-09-01",
+                              "endDate": "2026-09-05",
+                              "travelers": 2,
+                              "budget": 2500.00,
+                              "travelStyle": "CULTURAL",
+                              "interests": ["Food", "History", "Photography"]
+                            }
+                            """)))
     @Operation(summary = "Generate an AI itinerary with Gemini",
             description = "Sends the trip parameters to Gemini and persists the returned trip with its days and items. "
                     + "Per-user rate limited; Gemini failures return 502.")
@@ -82,6 +103,7 @@ public class TripController {
     }
 
     @PostMapping("/{tripId}/days/{dayNumber}/regenerate")
+    @Tag(name = "AI", description = "Gemini-powered itinerary generation")
     @Operation(summary = "Regenerate one day with Gemini",
             description = "Re-plans a single day of a trip. Sends a free-text instruction plus the trip context "
                     + "(destination, budget, travel style, interests, other days) to Gemini and replaces ONLY "
@@ -220,6 +242,33 @@ public class TripController {
             @Valid @RequestBody TripRequest request,
             Authentication authentication) {
         return tripService.updateTrip(currentUserId(authentication), tripId, request);
+    }
+
+    @GetMapping("/{tripId}/export/pdf")
+    @Operation(summary = "Export a trip as a PDF",
+            description = "Streams a printable PDF (OpenPDF) with the destination, dates, day-by-day "
+                    + "itinerary, and estimated budget. 403 if the trip belongs to another user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "PDF file (attachment)",
+                    content = @Content(mediaType = "application/pdf")),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Trip belongs to another user"),
+            @ApiResponse(responseCode = "404", description = "Trip not found")
+    })
+    public void exportPdf(
+            @Parameter(description = "Trip id", example = "1", required = true)
+            @PathVariable Long tripId,
+            Authentication authentication,
+            jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        TripResponse trip = tripService.getTripForUser(currentUserId(authentication), tripId);
+        byte[] pdf = pdfExportService.renderTripPdf(trip);
+        response.setStatus(HttpStatus.OK.value());
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", ContentDisposition.attachment()
+                .filename("trip-" + tripId + ".pdf", StandardCharsets.UTF_8)
+                .build().toString());
+        response.setContentLength(pdf.length);
+        response.getOutputStream().write(pdf);
     }
 
     @DeleteMapping("/{tripId}")

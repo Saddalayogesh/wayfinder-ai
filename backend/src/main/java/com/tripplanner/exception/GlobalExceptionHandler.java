@@ -15,6 +15,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -96,6 +97,26 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleItineraryGeneration(ItineraryGenerationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(ApiError.of(HttpStatus.BAD_GATEWAY, ex.getMessage()));
+    }
+
+    /** External provider unreachable (Gemini/Places network errors) -> 503. */
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleServiceUnavailable(ServiceUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiError.of(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage()));
+    }
+
+    /**
+     * Safety net: any RestClient transport failure that escapes a provider
+     * client (rather than degrading gracefully) becomes a clean 503 instead
+     * of leaking into the generic 500 handler.
+     */
+    @ExceptionHandler(org.springframework.web.client.RestClientException.class)
+    public ResponseEntity<ApiError> handleProviderTransportError(RestClientException ex) {
+        log.warn("External provider transport error: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiError.of(HttpStatus.SERVICE_UNAVAILABLE,
+                        "An external service is temporarily unavailable. Please try again shortly."));
     }
 
     @ExceptionHandler(RateLimitExceededException.class)

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Authentication", description = "Public endpoints to create an account and sign in")
+@Tag(name = "Auth", description = "Public endpoints to create an account and sign in")
 public class AuthController {
 
     private final AuthService authService;

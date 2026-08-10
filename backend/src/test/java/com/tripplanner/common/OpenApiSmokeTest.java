@@ -51,6 +51,9 @@ class OpenApiSmokeTest {
                 "/api/favorites",
                 "/api/users/me",
                 "/api/admin/cache/places",
+                "/api/trips/{tripId}/share",
+                "/api/shared/trips/{token}",
+                "/api/trips/{tripId}/export/pdf",
         }) {
             assertThat(doc.path("paths").has(path))
                     .as("OpenAPI document should describe %s", path)
@@ -60,5 +63,12 @@ class OpenApiSmokeTest {
         // The JWT bearer security scheme is declared (used by the Authorize button).
         assertThat(doc.path("components").path("securitySchemes").has("bearerAuth"))
                 .isTrue();
+
+        // Endpoints are grouped into the documented Swagger tags.
+        assertThat(doc.path("tags").isArray()).isTrue();
+        var tagNames = new java.util.ArrayList<String>();
+        doc.path("tags").forEach(tag -> tagNames.add(tag.path("name").asText()));
+        assertThat(tagNames)
+                .contains("Auth", "Trips", "AI", "Places", "Favorites", "Sharing");
     }
 }

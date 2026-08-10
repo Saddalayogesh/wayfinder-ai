@@ -188,6 +188,33 @@ export async function regenerateDay(
   return data
 }
 
+// --- Sharing + PDF export ----------------------------------------------------
+
+export interface ShareResponse {
+  token: string
+  shareUrl: string
+}
+
+/** Calls POST /api/trips/{id}/share — returns the public read-only token + URL. */
+export async function shareTrip(tripId: number | string): Promise<ShareResponse> {
+  const { data } = await api.post<ShareResponse>(`/trips/${tripId}/share`)
+  return data
+}
+
+/** Calls the public GET /api/shared/trips/{token} — no JWT needed. */
+export async function getSharedTrip(token: string): Promise<Trip> {
+  const { data } = await api.get<Trip>(`/shared/trips/${token}`)
+  return data
+}
+
+/** Downloads the owner-only PDF export as a Blob for the browser to save. */
+export async function downloadTripPdf(tripId: number | string): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/trips/${tripId}/export/pdf`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
 // --- Display helpers -------------------------------------------------------------
 
 /** Formats an ISO date (YYYY-MM-DD) without timezone shifts. */

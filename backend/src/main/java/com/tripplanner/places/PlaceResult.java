@@ -2,11 +2,15 @@ package com.tripplanner.places;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 /**
  * A place returned by a PlacesService provider. Fields the provider cannot
  * supply (rating, photo) are null.
+ *
+ * <p>Serializable so cached results can be stored in Redis (JDK serialization).</p>
  */
 @Schema(description = "A place found by the active places provider")
 public record PlaceResult(
@@ -17,5 +21,8 @@ public record PlaceResult(
         @Schema(example = "5 Avenue Anatole France, Paris, 75007, France") String address,
         @Schema(example = "4.7", nullable = true) BigDecimal rating,
         @Schema(nullable = true) String photoUrl
-) {
+) implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 }

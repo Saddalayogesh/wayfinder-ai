@@ -6,6 +6,8 @@ import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.exception.TripNotFoundException;
 import com.tripplanner.places.GeoPoint;
 import com.tripplanner.places.PlacesService;
+import com.tripplanner.trip.dto.CostBreakdown;
+import com.tripplanner.trip.dto.TripDayResponse;
 import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.TripRequest;
 import com.tripplanner.trip.dto.TripResponse;
@@ -22,6 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -190,6 +193,141 @@ class TripServiceTest {
 
         verify(tripRepository).findAllByUserIdOrderByCreatedAtDesc(USER_A);
         verify(tripRepository, never()).findAll();
+    }
+
+    // --- Day regeneration -------------------------------------------------------
+
+    /**
+     * The core guarantee: regenerating day 2 replaces ONLY day 2's items —
+     * day 1 and day 3 are byte-for-byte identical after the operation.
+     */
+    @Test
+    void replaceDayItems_replacesOnlyTargetDay_otherDaysByteForByteUnchanged() {
+        Trip trip = tripOfUser(USER_A, TRIP_ID);
+        TripDay day1 = new TripDay(1, LocalDate.of(2026, 8, 1));
+        day1.addItem(new ItineraryItem("Day1 Morning", "desc1", new BigDecimal("1.1"), new BigDecimal("2.2"),
+                new BigDecimal("10"), 60, 1));
+        day1.addItem(new ItineraryItem("Day1 Evening", null, null, null, new BigDecimal("5"), 45, 2));
+        TripDay day2 = new TripDay(2, LocalDate.of(2026, 8, 2));
+        day2.addItem(new ItineraryItem("Day2 Old Plan", null, new BigDecimal("3.3"), new BigDecimal("4.4"),
+                new BigDecimal("20"), 90, 1));
+        TripDay day3 = new TripDay(3, LocalDate.of(2026, 8, 3));
+        day3.addItem(new ItineraryItem("Day3 Only", "stable", new BigDecimal("5.5"), new BigDecimal("6.6"),
+                new BigDecimal("15"), 30, 1));
+        trip.addDay(day1);
+        trip.addDay(day2);
+        trip.addDay(day3);
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(trip));
+
+        TripResponse before = TripResponse.from(trip); // snapshot days 1 and 3
+
+        List<GeneratedActivity> newPlan = List.of(
+                new GeneratedActivity("Day2 New Place", 120, new BigDecimal("30"),
+                        new BigDecimal("7.7"), new BigDecimal("8.8")),
+                new GeneratedActivity("Day2 New Food", 60, new BigDecimal("12"), null, null));
+        TripResponse after = tripService.replaceDayItems(USER_A, TRIP_ID, 2, newPlan);
+
+        // Day 2 was replaced with the new plan...
+        assertEquals(2, after.days().get(1).items().size());
+        assertEquals("Day2 New Place", after.days().get(1).items().get(0).placeName());
+        assertEquals("Day2 New Food", after.days().get(1).items().get(1).placeName());
+
+        // ...and days 1 and 3 are byte-for-byte identical (record equality covers
+        // every field: ids, dayNumber, date, and all item fields).
+        assertEquals(before.days().get(0), after.days().get(0));
+        assertEquals(before.days().get(2), after.days().get(2));
+    }
+
+    @Test
+    void replaceDayItems_otherUsersTrip_throwsAccessDenied() {
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(tripOfUser(USER_A, TRIP_ID)));
+
+        assertThrows(AccessDeniedException.class,
+                () -> tripService.replaceDayItems(USER_B, TRIP_ID, 1, List.of()));
+    }
+
+    @Test
+    void getRegenerateContext_otherUsersTrip_throwsAccessDenied() {
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(tripOfUser(USER_A, TRIP_ID)));
+
+        assertThrows(AccessDeniedException.class,
+                () -> tripService.getRegenerateContext(USER_B, TRIP_ID, 1));
+    }
+
+    @Test
+    void getRegenerateContext_unknownDay_throwsNotFound() {
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(tripOfUser(USER_A, TRIP_ID)));
+
+        assertThrows(TripNotFoundException.class,
+                () -> tripService.getRegenerateContext(USER_A, TRIP_ID, 7));
+    }
+
+    @Test
+    void getRegenerateContext_flagsOnlyTheTargetDay() {
+        Trip trip = tripOfUser(USER_A, TRIP_ID);
+        TripDay day1 = new TripDay(1, LocalDate.of(2026, 8, 1));
+        day1.addItem(new ItineraryItem("Museum", null, null, null, null, 60, 1));
+        TripDay day2 = new TripDay(2, LocalDate.of(2026, 8, 2));
+        trip.addDay(day1);
+        trip.addDay(day2);
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(trip));
+
+        RegenerateContext context = tripService.getRegenerateContext(USER_A, TRIP_ID, 2);
+
+        assertThat(context.itinerarySummary()).contains("Day 1: Museum");
+        assertThat(context.itinerarySummary()).contains("Day 2: (no plan yet) [THIS IS THE DAY BEING REGENERATED]");
+        assertThat(context.destination()).isEqualTo("Destination");
+    }
+
+    // --- Cost breakdown ----------------------------------------------------------
+
+    @Test
+    void costBreakdownSumsAllItemsAndComputesRemaining() {
+        Trip trip = tripOfUser(USER_A, TRIP_ID); // budget 1000
+        TripDay day1 = new TripDay(1, LocalDate.of(2026, 8, 1));
+        day1.addItem(new ItineraryItem("Hotel Stay", null, null, null, new BigDecimal("300"), 480, 1));
+        day1.addItem(new ItineraryItem("Sushi Dinner", null, null, null, new BigDecimal("80"), 90, 2));
+        TripDay day2 = new TripDay(2, LocalDate.of(2026, 8, 2));
+        day2.addItem(new ItineraryItem("Taxi", null, null, null, new BigDecimal("20"), 30, 1));
+        trip.addDay(day1);
+        trip.addDay(day2);
+
+        CostBreakdown cost = CostBreakdown.from(trip);
+
+        assertEquals(0, new BigDecimal("400").compareTo(cost.estimatedTotal()));
+        assertEquals(0, new BigDecimal("600").compareTo(cost.remaining()));
+        assertEquals(0, new BigDecimal("300").compareTo(cost.breakdown().get("accommodation")));
+        assertEquals(0, new BigDecimal("80").compareTo(cost.breakdown().get("food")));
+        assertEquals(0, new BigDecimal("20").compareTo(cost.breakdown().get("transport")));
+        assertEquals(0, new BigDecimal("0").compareTo(cost.breakdown().get("activities")));
+    }
+
+    @Test
+    void costBreakdown_defaultsUnmatchedItemsToActivities() {
+        Trip trip = tripOfUser(USER_A, TRIP_ID);
+        TripDay day = new TripDay(1, LocalDate.of(2026, 8, 1));
+        day.addItem(new ItineraryItem("Kinkaku-ji Temple", null, null, null, new BigDecimal("10"), 90, 1));
+        day.addItem(new ItineraryItem("Walking tour", null, null, null, new BigDecimal("25"), 120, 2));
+        trip.addDay(day);
+
+        CostBreakdown cost = CostBreakdown.from(trip);
+
+        assertEquals(0, new BigDecimal("35").compareTo(cost.breakdown().get("activities")));
+        assertEquals(0, new BigDecimal("35").compareTo(cost.estimatedTotal()));
+    }
+
+    @Test
+    void costBreakdown_ignoresItemsWithoutCost() {
+        Trip trip = tripOfUser(USER_A, TRIP_ID);
+        TripDay day = new TripDay(1, LocalDate.of(2026, 8, 1));
+        day.addItem(new ItineraryItem("Free Walk", null, null, null, null, 60, 1));
+        day.addItem(new ItineraryItem("Also Free", null, null, null, null, 60, 2));
+        trip.addDay(day);
+
+        CostBreakdown cost = CostBreakdown.from(trip);
+
+        assertEquals(0, new BigDecimal("0").compareTo(cost.estimatedTotal()));
+        assertEquals(0, new BigDecimal("1000").compareTo(cost.remaining()));
     }
 
     // --- Helpers ---------------------------------------------------------------

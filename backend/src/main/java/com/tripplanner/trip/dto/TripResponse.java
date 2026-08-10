@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
-@Schema(description = "A trip with its full itinerary (days and items)")
+@Schema(description = "A trip with its full itinerary (days and items) and budget summary")
 public record TripResponse(
         Long id,
         String title,
@@ -21,6 +21,7 @@ public record TripResponse(
         String travelStyle,
         Set<String> interests,
         List<TripDayResponse> days,
+        CostBreakdown cost,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -30,6 +31,7 @@ public record TripResponse(
                 trip.getStartDate(), trip.getEndDate(), trip.getTravelers(), trip.getBudget(),
                 trip.getTravelStyle(), Set.copyOf(trip.getInterests()),
                 trip.getDays().stream().map(TripDayResponse::from).toList(),
+                CostBreakdown.from(trip),
                 trip.getCreatedAt(), trip.getUpdatedAt());
     }
 }

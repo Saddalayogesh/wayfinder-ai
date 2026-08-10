@@ -12,6 +12,7 @@ import {
   formatCurrency,
   formatDate,
   getTrip,
+  regenerateDay,
   updateTrip,
   type ItineraryItemInput,
   type Trip,
@@ -41,6 +42,11 @@ export default function TripDetails() {
 
   const [highlightedItemId, setHighlightedItemId] = useState<number | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
+
+  // Day regeneration: which day's modal is open, its text, and which day is in-flight.
+  const [regenerateDayNumber, setRegenerateDayNumber] = useState<number | null>(null)
+  const [regenerateInstruction, setRegenerateInstruction] = useState('')
+  const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -188,6 +194,26 @@ export default function TripDetails() {
     }
   }
 
+  /** Gemini re-plans one day; every other day stays untouched. */
+  const handleRegenerate = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!id || regenerateDayNumber == null || !regenerateInstruction.trim()) return
+    const target = regenerateDayNumber
+    setBusy(true) // also locks trip-level Edit/Delete while the AI is working
+    setRegeneratingDay(target)
+    try {
+      refresh(await regenerateDay(id, target, regenerateInstruction.trim()))
+      setRegenerateDayNumber(null)
+      setRegenerateInstruction('')
+      setError(null)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not regenerate this day. Please try again in a few minutes.'))
+    } finally {
+      setRegeneratingDay(null)
+      setBusy(false)
+    }
+  }
+
   if (state === 'loading') {
     return (
       <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
@@ -220,6 +246,13 @@ export default function TripDetails() {
 
   const inputClass =
     'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200'
+
+  // Budget summary numbers (recomputed on every render, so they stay live
+  // after regenerations and edits).
+  const estimated = trip.cost?.estimatedTotal ?? 0
+  const remaining = trip.cost?.remaining ?? null
+  const pct = trip.budget > 0 ? Math.min(100, (estimated / trip.budget) * 100) : 0
+  const over = trip.budget > 0 && estimated > trip.budget
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
@@ -300,6 +333,76 @@ export default function TripDetails() {
               ))}
             </div>
           )}
+
+          {/* Budget summary — updates live after any regeneration */}
+          <section className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">Budget</h2>
+              <span
+                className={`text-xs font-semibold ${
+                  over
+                    ? 'text-rose-600'
+                    : pct >= 80
+                      ? 'text-amber-600'
+                      : 'text-emerald-600'
+                }`}
+              >
+                {over ? 'Over budget' : pct >= 80 ? 'Close to budget' : 'On track'}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Budget
+                </div>
+                <div className="mt-1 text-lg font-bold text-slate-900">
+                  {formatCurrency(trip.budget)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Estimated
+                </div>
+                <div className={`mt-1 text-lg font-bold ${over ? 'text-rose-600' : 'text-slate-900'}`}>
+                  {formatCurrency(estimated)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Remaining
+                </div>
+                <div
+                  className={`mt-1 text-lg font-bold ${
+                    remaining != null && remaining < 0 ? 'text-rose-600' : 'text-emerald-600'
+                  }`}
+                >
+                  {remaining != null ? formatCurrency(remaining) : '—'}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  over ? 'bg-rose-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {trip.cost && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {Object.entries(trip.cost.breakdown)
+                  .filter(([, value]) => value > 0)
+                  .map(([category, value]) => (
+                    <span
+                      key={category}
+                      className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium capitalize text-slate-600 ring-1 ring-slate-200"
+                    >
+                      {category} · {formatCurrency(value)}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </section>
 
           {/* Interactive map */}
           {mapItems.some((i) => i.latitude != null && i.longitude != null) && (
@@ -385,7 +488,24 @@ export default function TripDetails() {
                           {formatDate(day.date)}
                         </span>
                       </h3>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
+                        {regeneratingDay === day.dayNumber ? (
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-indigo-600">
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                            Re-planning…
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setRegenerateInstruction('')
+                              setRegenerateDayNumber(day.dayNumber)
+                            }}
+                            disabled={busy || regeneratingDay != null}
+                            className="text-sm font-medium text-indigo-600 transition hover:text-indigo-800 disabled:opacity-50"
+                          >
+                            ✨ Regenerate
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             if (itemFormFor === day.id) {
@@ -398,13 +518,14 @@ export default function TripDetails() {
                               setItemFormFor(day.id)
                             }
                           }}
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                          disabled={busy || regeneratingDay != null}
+                          className="text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
                         >
                           {itemFormFor === day.id ? 'Cancel' : '+ Add place'}
                         </button>
                         <button
                           onClick={() => handleDeleteDay(day.id)}
-                          disabled={busy}
+                          disabled={busy || regeneratingDay === day.dayNumber}
                           className="text-sm font-medium text-rose-500 hover:text-rose-600 disabled:opacity-50"
                         >
                           Delete day
@@ -523,6 +644,57 @@ export default function TripDetails() {
               </div>
             )}
           </section>
+        </div>
+      )}
+
+      {/* Regenerate-day modal */}
+      {regenerateDayNumber != null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setRegenerateDayNumber(null)}
+        >
+          <form
+            onSubmit={handleRegenerate}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="regenerate-modal-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="regenerate-modal-title" className="text-lg font-bold text-slate-900">
+              Regenerate Day {regenerateDayNumber}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Tell Gemini how to re-plan this day — the rest of your itinerary
+              stays exactly as it is.
+            </p>
+            <textarea
+              value={regenerateInstruction}
+              onChange={(e) => setRegenerateInstruction(e.target.value)}
+              placeholder="e.g. Focus on food, skip crowded tourist spots, start late in the morning"
+              rows={3}
+              maxLength={500}
+              autoFocus
+              className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRegenerateDayNumber(null)}
+                disabled={regeneratingDay != null}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!regenerateInstruction.trim() || regeneratingDay != null}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {regeneratingDay === regenerateDayNumber ? 'Regenerating…' : '✨ Regenerate day'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </main>

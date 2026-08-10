@@ -98,6 +98,20 @@ export async function createTrip(input: TripInput): Promise<Trip> {
   return data
 }
 
+/** Calls POST /api/trips/generate — Gemini builds the itinerary, backend persists it. */
+export async function generateTrip(input: TripInput): Promise<Trip> {
+  const { data } = await api.post<Trip>('/trips/generate', {
+    destination: input.destination,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    travelers: input.travelers,
+    budget: input.budget,
+    travelStyle: input.travelStyle,
+    interests: input.interests ?? [],
+  })
+  return data
+}
+
 export async function getTrips(): Promise<Trip[]> {
   const { data } = await api.get<Trip[]>('/trips')
   return data

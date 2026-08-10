@@ -1,11 +1,13 @@
 package com.tripplanner.trip;
 
 import com.tripplanner.ai.GeminiService;
+import com.tripplanner.ai.dto.GeneratedActivity;
 import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.common.RateLimiter;
 import com.tripplanner.exception.RateLimitExceededException;
 import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.ItineraryItemRequest;
+import com.tripplanner.trip.dto.RegenerateDayRequest;
 import com.tripplanner.trip.dto.TripDayRequest;
 import com.tripplanner.trip.dto.TripRequest;
 import com.tripplanner.trip.dto.TripResponse;
@@ -13,6 +15,7 @@ import com.tripplanner.user.User;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -76,6 +79,88 @@ public class TripController {
         }
         GeneratedItinerary itinerary = geminiService.generateItinerary(request);
         return tripService.persistGeneratedItinerary(userId, request, itinerary);
+    }
+
+    @PostMapping("/{tripId}/days/{dayNumber}/regenerate")
+    @Operation(summary = "Regenerate one day with Gemini",
+            description = "Re-plans a single day of a trip. Sends a free-text instruction plus the trip context "
+                    + "(destination, budget, travel style, interests, other days) to Gemini and replaces ONLY "
+                    + "that day's items — every other day stays untouched. Shares the per-user rate limit "
+                    + "with trip generation; Gemini failures return 502.")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = RegenerateDayRequest.class),
+                    examples = @ExampleObject(name = "regenerateDay", value = """
+                            {
+                              "instruction": "Focus on food and skip crowded tourist spots"
+                            }
+                            """)))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Day regenerated; the full updated trip is returned",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = TripResponse.class),
+                            examples = @ExampleObject(name = "updatedTrip", value = """
+                                    {
+                                      "id": 7,
+                                      "title": "AI itinerary for Kyoto",
+                                      "destination": "Kyoto",
+                                      "days": [
+                                        {
+                                          "id": 21,
+                                          "dayNumber": 2,
+                                          "date": "2026-09-02",
+                                          "items": [
+                                            {
+                                              "id": 52,
+                                              "placeName": "Nishiki Market food tour",
+                                              "description": null,
+                                              "latitude": 35.0046,
+                                              "longitude": 135.7644,
+                                              "estimatedCost": 40,
+                                              "visitDuration": 120,
+                                              "sequenceOrder": 1
+                                            }
+                                          ]
+                                        }
+                                      ],
+                                      "cost": {
+                                        "estimatedTotal": 1380,
+                                        "remaining": 1120,
+                                        "breakdown": {
+                                          "accommodation": 0,
+                                          "food": 620,
+                                          "activities": 510,
+                                          "transport": 250
+                                        }
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "400", description = "Validation failed (blank or too long instruction)"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT"),
+            @ApiResponse(responseCode = "403", description = "Trip belongs to another user"),
+            @ApiResponse(responseCode = "404", description = "Trip or day not found"),
+            @ApiResponse(responseCode = "429", description = "Rate limit exceeded"),
+            @ApiResponse(responseCode = "502", description = "Gemini failed, timed out, or returned an unusable response")
+    })
+    public TripResponse regenerateDay(
+            @Parameter(description = "Trip id", example = "1", required = true)
+            @PathVariable Long tripId,
+            @Parameter(description = "Day number to regenerate (1-based)", example = "2", required = true)
+            @PathVariable int dayNumber,
+            @Valid @RequestBody RegenerateDayRequest request,
+            Authentication authentication) {
+        Long userId = currentUserId(authentication);
+        if (!rateLimiter.tryAcquire(userId)) {
+            throw new RateLimitExceededException(
+                    "AI generation limit reached. Please try again in a few minutes.");
+        }
+        // Context (with ownership check) is read before the AI call so the slow
+        // Gemini request never runs inside a DB transaction.
+        RegenerateContext context = tripService.getRegenerateContext(userId, tripId, dayNumber);
+        List<GeneratedActivity> activities = geminiService.regenerateDay(
+                context.destination(), dayNumber, context.itinerarySummary(), context.budget(),
+                context.travelStyle(), List.copyOf(context.interests()), request.instruction());
+        return tripService.replaceDayItems(userId, tripId, dayNumber, activities);
     }
 
     @PostMapping

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -123,7 +124,7 @@ public class TripService {
                 .collect(Collectors.toMap(GeneratedDay::day, GeneratedDay::activities,
                         (first, second) -> first, LinkedHashMap::new));
 
-        int fallbackGeocodes = 0;
+        GeocodeBudget geocodeBudget = new GeocodeBudget();
         for (int dayNumber = 1; dayNumber <= dayCount; dayNumber++) {
             LocalDate date = request.startDate().plusDays(dayNumber - 1L);
             TripDay day = new TripDay(dayNumber, date);
@@ -132,16 +133,7 @@ public class TripService {
                 if (activity.name() == null || activity.name().isBlank()) {
                     continue;
                 }
-                GeoPoint coordinates = null;
-                if (activity.latitude() != null && activity.longitude() != null) {
-                    coordinates = new GeoPoint(activity.latitude(), activity.longitude());
-                } else if (fallbackGeocodes < MAX_FALLBACK_GEOCODES) {
-                    // Geocode with the destination as a disambiguation hint so
-                    // generic names ("Old Town") resolve in the right city.
-                    String query = activity.name().trim() + (destination.isBlank() ? "" : ", " + destination);
-                    coordinates = placesService.geocode(query).orElse(null);
-                    fallbackGeocodes++;
-                }
+                GeoPoint coordinates = coordsFor(activity, destination, geocodeBudget);
                 day.addItem(new ItineraryItem(activity.name().trim(), null,
                         coordinates == null ? null : coordinates.latitude(),
                         coordinates == null ? null : coordinates.longitude(),
@@ -150,6 +142,90 @@ public class TripService {
             trip.addDay(day);
         }
         return TripResponse.from(tripRepository.save(trip));
+    }
+
+    /**
+     * Returns the context needed to regenerate one day: verifies ownership and
+     * that the day exists (403/404), then snapshots the trip's context plus a
+     * compact summary of every day so the AI can keep the rest of the trip
+     * consistent. The AI call itself happens outside this transaction.
+     */
+    @Transactional(readOnly = true)
+    public RegenerateContext getRegenerateContext(Long userId, Long tripId, int dayNumber) {
+        Trip trip = getOwnedTrip(tripId, userId);
+        TripDay target = findDayByNumber(trip, dayNumber);
+        String summary = trip.getDays().stream()
+                .sorted(Comparator.comparingInt(TripDay::getDayNumber))
+                .map(day -> {
+                    String plan = day.getItems().stream()
+                            .map(ItineraryItem::getPlaceName)
+                            .collect(Collectors.joining(", "));
+                    boolean isTarget = day.getDayNumber() == target.getDayNumber();
+                    return "Day " + day.getDayNumber() + ": "
+                            + (plan.isEmpty() ? "(no plan yet)" : plan)
+                            + (isTarget ? " [THIS IS THE DAY BEING REGENERATED]" : "");
+                })
+                .collect(Collectors.joining(" | "));
+        return new RegenerateContext(trip.getDestination(), trip.getBudget(), trip.getTravelStyle(),
+                Set.copyOf(trip.getInterests()), summary);
+    }
+
+    /**
+     * Replaces ONLY the items of the given day with freshly generated ones;
+     * every other day is untouched. Ownership is re-verified (403 for other
+     * users, 404 for unknown trips/days).
+     */
+    @Transactional
+    public TripResponse replaceDayItems(Long userId, Long tripId, int dayNumber,
+                                        List<GeneratedActivity> activities) {
+        Trip trip = getOwnedTrip(tripId, userId);
+        TripDay day = findDayByNumber(trip, dayNumber);
+        day.getItems().clear(); // orphanRemoval deletes the old items
+        String destination = trip.getDestination();
+        GeocodeBudget geocodeBudget = new GeocodeBudget();
+        int order = 1;
+        for (GeneratedActivity activity : activities) {
+            if (activity.name() == null || activity.name().isBlank()) {
+                continue;
+            }
+            GeoPoint coordinates = coordsFor(activity, destination, geocodeBudget);
+            day.addItem(new ItineraryItem(activity.name().trim(), null,
+                    coordinates == null ? null : coordinates.latitude(),
+                    coordinates == null ? null : coordinates.longitude(),
+                    activity.estimatedCost(), activity.duration(), order++));
+        }
+        return TripResponse.from(trip);
+    }
+
+    /**
+     * Uses the Gemini coordinates when present; otherwise falls back to the
+     * PlacesService geocoder (destination-hinted) while the per-request
+     * geocode budget lasts. Returns null when neither source can produce
+     * coordinates (the item is then simply unmapped).
+     */
+    private GeoPoint coordsFor(GeneratedActivity activity, String destination, GeocodeBudget budget) {
+        if (activity.latitude() != null && activity.longitude() != null) {
+            return new GeoPoint(activity.latitude(), activity.longitude());
+        }
+        if (!budget.canUse()) {
+            return null;
+        }
+        budget.use();
+        String query = activity.name().trim() + (destination.isBlank() ? "" : ", " + destination);
+        return placesService.geocode(query).orElse(null);
+    }
+
+    /** Bounds the number of slow fallback geocoding calls per request. */
+    private static final class GeocodeBudget {
+        private int used;
+
+        boolean canUse() {
+            return used < MAX_FALLBACK_GEOCODES;
+        }
+
+        void use() {
+            used++;
+        }
     }
 
     // --- Day / item management ----------------------------------------------
@@ -219,6 +295,13 @@ public class TripService {
                 .filter(day -> day.getId().equals(dayId))
                 .findFirst()
                 .orElseThrow(() -> new TripNotFoundException("Trip day not found"));
+    }
+
+    private TripDay findDayByNumber(Trip trip, int dayNumber) {
+        return trip.getDays().stream()
+                .filter(day -> day.getDayNumber() == dayNumber)
+                .findFirst()
+                .orElseThrow(() -> new TripNotFoundException("Trip day " + dayNumber + " not found"));
     }
 
     private void replaceDays(Trip trip, List<TripDayRequest> days) {

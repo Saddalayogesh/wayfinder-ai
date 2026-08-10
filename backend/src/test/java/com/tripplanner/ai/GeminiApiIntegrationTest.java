@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,14 @@ class GeminiApiIntegrationTest {
                 { "day": 2, "activities": [
                   { "name": "TeamLab Planets", "duration": 90, "estimatedCost": 25 }
                 ]}
+              ]
+            }
+            """;
+
+    private static final String REGEN_JSON = """
+            {
+              "activities": [
+                { "name": "Food Market Tour", "duration": 150, "estimatedCost": 45, "latitude": 35.0046, "longitude": 135.7644 }
               ]
             }
             """;
@@ -151,6 +160,82 @@ class GeminiApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    // --- Day regeneration ---------------------------------------------------------
+
+    @Test
+    void regenerateDayReplacesOnlyThatDay() throws Exception {
+        when(geminiClient.generateText(anyString())).thenReturn(REGEN_JSON);
+        String token = register("regen.ok@example.com");
+        long tripId = createThreeDayTrip(token);
+
+        mockMvc.perform(post("/api/trips/" + tripId + "/days/2/regenerate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"instruction\": \"Focus on food\"}"))
+                .andExpect(status().isOk())
+                // Day 2 was replaced with the regenerated plan...
+                .andExpect(jsonPath("$.days[1].items.length()").value(1))
+                .andExpect(jsonPath("$.days[1].items[0].placeName").value("Food Market Tour"))
+                .andExpect(jsonPath("$.days[1].items[0].estimatedCost").value(45))
+                // ...and days 1 and 3 are untouched.
+                .andExpect(jsonPath("$.days[0].items[0].placeName").value("Day One Place"))
+                .andExpect(jsonPath("$.days[2].items[0].placeName").value("Day Three Place"));
+    }
+
+    @Test
+    void regenerateDayOfAnotherUsersTripReturns403WithoutCallingGemini() throws Exception {
+        String owner = register("regen.owner@example.com");
+        String intruder = register("regen.intruder@example.com");
+        long tripId = createThreeDayTrip(owner);
+
+        mockMvc.perform(post("/api/trips/" + tripId + "/days/2/regenerate")
+                        .header("Authorization", "Bearer " + intruder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"instruction\": \"sabotage\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        // The AI was never called for a trip the caller does not own.
+        verify(geminiClient, never()).generateText(anyString());
+    }
+
+    @Test
+    void regenerateDayOfUnknownDayReturns404() throws Exception {
+        when(geminiClient.generateText(anyString())).thenReturn(REGEN_JSON);
+        String token = register("regen.missingday@example.com");
+        long tripId = createThreeDayTrip(token);
+
+        mockMvc.perform(post("/api/trips/" + tripId + "/days/9/regenerate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"instruction\": \"x\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void regenerateSharesTheGenerationRateLimit() throws Exception {
+        when(geminiClient.generateText(anyString())).thenReturn(VALID_JSON);
+        String token = register("regen.limited@example.com");
+
+        // Capacity is 3 (shared bucket between generate and regenerate).
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/api/trips/generate")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(generateBody()))
+                    .andExpect(status().isCreated());
+        }
+        mockMvc.perform(post("/api/trips/1/days/1/regenerate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"instruction\": \"x\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429));
+
+        // Gemini was reached exactly 3 times — the blocked regenerate never got through.
+        verify(geminiClient, times(3)).generateText(anyString());
+    }
+
     // --- Helpers ----------------------------------------------------------------
 
     private String register(String email) throws Exception {
@@ -176,5 +261,32 @@ class GeminiApiIntegrationTest {
                   "interests": ["Food", "Culture"]
                 }
                 """;
+    }
+
+    /** Creates a 3-day trip via the regular create endpoint. */
+    private long createThreeDayTrip(String token) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/trips")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Regen Test Trip",
+                                  "destination": "Tokyo",
+                                  "startDate": "2026-08-15",
+                                  "endDate": "2026-08-17",
+                                  "travelers": 2,
+                                  "budget": 3000.00,
+                                  "travelStyle": "CULTURAL",
+                                  "interests": ["Food"],
+                                  "days": [
+                                    { "date": "2026-08-15", "items": [ { "placeName": "Day One Place", "estimatedCost": 50 } ] },
+                                    { "date": "2026-08-16", "items": [ { "placeName": "Day Two Place", "estimatedCost": 70 } ] },
+                                    { "date": "2026-08-17", "items": [ { "placeName": "Day Three Place", "estimatedCost": 30 } ] }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 }

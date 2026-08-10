@@ -23,6 +23,17 @@ export interface TripDay {
   items: ItineraryItem[]
 }
 
+export interface CostBreakdown {
+  estimatedTotal: number
+  remaining: number | null
+  breakdown: {
+    accommodation: number
+    food: number
+    activities: number
+    transport: number
+  }
+}
+
 export interface Trip {
   id: number
   title: string
@@ -34,6 +45,7 @@ export interface Trip {
   travelStyle: string
   interests: string[]
   days: TripDay[]
+  cost: CostBreakdown
   createdAt: string
   updatedAt: string
 }
@@ -161,6 +173,18 @@ export async function deleteItem(
   itemId: number,
 ): Promise<Trip> {
   const { data } = await api.delete<Trip>(`/trips/${tripId}/days/${dayId}/items/${itemId}`)
+  return data
+}
+
+/** Calls POST /api/trips/{id}/days/{dayNumber}/regenerate — Gemini re-plans one day. */
+export async function regenerateDay(
+  tripId: number | string,
+  dayNumber: number,
+  instruction: string,
+): Promise<Trip> {
+  const { data } = await api.post<Trip>(`/trips/${tripId}/days/${dayNumber}/regenerate`, {
+    instruction,
+  })
   return data
 }
 

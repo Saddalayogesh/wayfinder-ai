@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getErrorMessage, getMe } from '../services/api'
 
@@ -76,6 +76,22 @@ export default function Dashboard() {
             </dd>
           </div>
         </dl>
+
+        {/* Shortcut into trip management */}
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-indigo-50 p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Plan a trip</h2>
+            <p className="mt-0.5 text-sm text-slate-600">
+              Create and manage your trips — itineraries land here soon.
+            </p>
+          </div>
+          <Link
+            to="/trips"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            My trips
+          </Link>
+        </div>
 
         {/* Live check that the JWT authenticates against the backend */}
         <div className="mt-8 rounded-xl border border-slate-200 p-4">

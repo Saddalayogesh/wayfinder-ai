@@ -4,6 +4,8 @@ import com.tripplanner.ai.dto.GeneratedActivity;
 import com.tripplanner.ai.dto.GeneratedDay;
 import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.exception.TripNotFoundException;
+import com.tripplanner.places.GeoPoint;
+import com.tripplanner.places.PlacesService;
 import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.ItineraryItemRequest;
 import com.tripplanner.trip.dto.TripDayRequest;
@@ -34,9 +36,11 @@ import java.util.stream.Collectors;
 public class TripService {
 
     private final TripRepository tripRepository;
+    private final PlacesService placesService;
 
-    public TripService(TripRepository tripRepository) {
+    public TripService(TripRepository tripRepository, PlacesService placesService) {
         this.tripRepository = tripRepository;
+        this.placesService = placesService;
     }
 
     @Transactional
@@ -90,6 +94,14 @@ public class TripService {
     private static final int MAX_GENERATED_DAYS = 31;
 
     /**
+     * Cap on fallback geocoding calls per generation. Geocoding is slow and
+     * must stay bounded (it runs inside the persistence transaction, and the
+     * free provider is limited to ~1 request/second). Items beyond the cap are
+     * simply left without coordinates rather than stalling the request.
+     */
+    private static final int MAX_FALLBACK_GEOCODES = 20;
+
+    /**
      * Persists a trip from a Gemini-generated itinerary. Days are created for
      * every date in the requested range; activities are attached to the day
      * matching their day number (activities for out-of-range days are dropped).
@@ -99,9 +111,10 @@ public class TripService {
                                                   GeneratedItinerary itinerary) {
         long requestedDays = ChronoUnit.DAYS.between(request.startDate(), request.endDate()) + 1;
         int dayCount = (int) Math.min(requestedDays, MAX_GENERATED_DAYS);
+        String destination = request.destination().trim();
 
-        Trip trip = new Trip(userId, "AI itinerary for " + request.destination().trim(),
-                request.destination().trim(), request.startDate(), request.endDate(),
+        Trip trip = new Trip(userId, "AI itinerary for " + destination,
+                destination, request.startDate(), request.endDate(),
                 request.travelers(), request.budget(), request.travelStyle().trim());
         trip.setInterests(sanitizeInterests(request.interests()));
 
@@ -110,6 +123,7 @@ public class TripService {
                 .collect(Collectors.toMap(GeneratedDay::day, GeneratedDay::activities,
                         (first, second) -> first, LinkedHashMap::new));
 
+        int fallbackGeocodes = 0;
         for (int dayNumber = 1; dayNumber <= dayCount; dayNumber++) {
             LocalDate date = request.startDate().plusDays(dayNumber - 1L);
             TripDay day = new TripDay(dayNumber, date);
@@ -118,8 +132,19 @@ public class TripService {
                 if (activity.name() == null || activity.name().isBlank()) {
                     continue;
                 }
+                GeoPoint coordinates = null;
+                if (activity.latitude() != null && activity.longitude() != null) {
+                    coordinates = new GeoPoint(activity.latitude(), activity.longitude());
+                } else if (fallbackGeocodes < MAX_FALLBACK_GEOCODES) {
+                    // Geocode with the destination as a disambiguation hint so
+                    // generic names ("Old Town") resolve in the right city.
+                    String query = activity.name().trim() + (destination.isBlank() ? "" : ", " + destination);
+                    coordinates = placesService.geocode(query).orElse(null);
+                    fallbackGeocodes++;
+                }
                 day.addItem(new ItineraryItem(activity.name().trim(), null,
-                        activity.latitude(), activity.longitude(),
+                        coordinates == null ? null : coordinates.latitude(),
+                        coordinates == null ? null : coordinates.longitude(),
                         activity.estimatedCost(), activity.duration(), order++));
             }
             trip.addDay(day);

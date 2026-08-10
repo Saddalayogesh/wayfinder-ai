@@ -11,6 +11,9 @@ export interface ItineraryItem {
   estimatedCost: number | null
   visitDuration: number | null
   sequenceOrder: number
+  /** Optional enrichment (e.g. from Google Places) — rendered when present. */
+  rating?: number | null
+  photoUrl?: string | null
 }
 
 export interface TripDay {

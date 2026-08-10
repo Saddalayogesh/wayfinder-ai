@@ -1,6 +1,7 @@
 package com.tripplanner.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tripplanner.places.PlacesService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,6 +51,9 @@ class GeminiApiIntegrationTest {
 
     @MockBean
     private GeminiClient geminiClient;
+
+    @MockBean
+    private PlacesService placesService;
 
     @Test
     void generatePersistsTripWithDaysAndItems() throws Exception {

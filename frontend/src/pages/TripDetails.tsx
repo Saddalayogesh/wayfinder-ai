@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import MapView, { type MapItem } from '../components/MapView'
 import TripForm from '../components/TripForm'
 import { getErrorMessage } from '../services/api'
 import {
@@ -38,6 +39,9 @@ export default function TripDetails() {
   const [estimatedCost, setEstimatedCost] = useState('')
   const [visitDuration, setVisitDuration] = useState('')
 
+  const [highlightedItemId, setHighlightedItemId] = useState<number | null>(null)
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
+
   const load = useCallback(async () => {
     if (!id) return
     setState('loading')
@@ -57,6 +61,41 @@ export default function TripDetails() {
 
   const refresh = (updated: Trip) => {
     setTrip(updated)
+    setSelectedItemId(null)
+    setHighlightedItemId(null)
+  }
+
+  /** All itinerary items flattened with their day number, for the map. */
+  const mapItems = useMemo<MapItem[]>(() => {
+    if (!trip) return []
+    return trip.days.flatMap((day) =>
+      day.items.map((item) => ({
+        id: item.id,
+        name: item.placeName,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        dayNumber: day.dayNumber,
+        description: item.description,
+        estimatedCost: item.estimatedCost,
+        visitDuration: item.visitDuration,
+        rating: item.rating ?? null,
+        photoUrl: item.photoUrl ?? null,
+      })),
+    )
+  }, [trip])
+
+  const mappedItemCount = mapItems.filter((i) => i.latitude != null && i.longitude != null).length
+
+  /** Marker clicked -> highlight the matching list entry and scroll to it. */
+  const handleMarkerSelect = (itemId: number) => {
+    setSelectedItemId(itemId)
+    setHighlightedItemId(itemId)
+    document.getElementById(`trip-item-${itemId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  /** List entry hovered -> open/pan to its marker. */
+  const handleItemHover = (itemId: number | null) => {
+    setHighlightedItemId(itemId)
   }
 
   const handleEditSubmit = async (input: TripInput) => {
@@ -262,6 +301,29 @@ export default function TripDetails() {
             </div>
           )}
 
+          {/* Interactive map */}
+          {mapItems.some((i) => i.latitude != null && i.longitude != null) && (
+            <section className="mt-8">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">Map</h2>
+                {mappedItemCount < mapItems.length && (
+                  <span className="text-xs text-slate-400">
+                    {mapItems.length - mappedItemCount} place{mapItems.length - mappedItemCount === 1 ? '' : 's'} without coordinates
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Click a pin or a place below to find it on the other side.
+              </p>
+              <MapView
+                className="mt-3"
+                items={mapItems}
+                highlightedId={highlightedItemId}
+                onSelectItem={handleMarkerSelect}
+              />
+            </section>
+          )}
+
           {/* Itinerary */}
           <section className="mt-8">
             <div className="flex items-center justify-between">
@@ -406,7 +468,20 @@ export default function TripDetails() {
                     ) : (
                       <ol className="divide-y divide-slate-100">
                         {day.items.map((item) => (
-                          <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                          <li
+                            key={item.id}
+                            id={`trip-item-${item.id}`}
+                            onMouseEnter={() => handleItemHover(item.id)}
+                            onMouseLeave={() => handleItemHover(null)}
+                            onClick={() => handleMarkerSelect(item.id)}
+                            className={`flex cursor-pointer items-start justify-between gap-3 px-4 py-3 transition-colors ${
+                              selectedItemId === item.id
+                                ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300'
+                                : highlightedItemId === item.id
+                                  ? 'bg-indigo-50/60'
+                                  : 'hover:bg-slate-50'
+                            }`}
+                          >
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">
@@ -420,7 +495,12 @@ export default function TripDetails() {
                                 <p className="mt-1 text-sm text-slate-500">{item.description}</p>
                               )}
                               <p className="mt-1 text-xs text-slate-400">
-                                {item.estimatedCost != null && `${formatCurrency(item.estimatedCost)}`}
+                                {item.latitude == null || item.longitude == null ? (
+                                  <span className="text-slate-300">no map pin</span>
+                                ) : (
+                                  '📍'
+                                )}
+                                {item.estimatedCost != null && `  ${formatCurrency(item.estimatedCost)}`}
                                 {item.estimatedCost != null && item.visitDuration != null && ' · '}
                                 {item.visitDuration != null &&
                                   `${item.visitDuration >= 60 ? `${Math.floor(item.visitDuration / 60)}h${item.visitDuration % 60 ? ` ${item.visitDuration % 60}m` : ''}` : `${item.visitDuration}m`}`}

@@ -2,10 +2,14 @@ package com.tripplanner.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -42,6 +46,16 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(HttpStatus.BAD_REQUEST, "Malformed request body"));
     }
 
+    /** Missing, malformed, or constraint-violating request parameters -> 400. */
+    @ExceptionHandler({MissingServletRequestParameterException.class,
+            MethodArgumentTypeMismatchException.class,
+            ConstraintViolationException.class,
+            HandlerMethodValidationException.class})
+    public ResponseEntity<ApiError> handleInvalidRequestParameter(Exception ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiError.of(HttpStatus.BAD_REQUEST, "Invalid request parameter"));
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -62,6 +76,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TripNotFoundException.class)
     public ResponseEntity<ApiError> handleTripNotFound(TripNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    @ExceptionHandler(PlaceNotFoundException.class)
+    public ResponseEntity<ApiError> handlePlaceNotFound(PlaceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
     }

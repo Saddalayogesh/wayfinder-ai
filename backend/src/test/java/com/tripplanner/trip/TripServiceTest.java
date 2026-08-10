@@ -1,6 +1,12 @@
 package com.tripplanner.trip;
 
+import com.tripplanner.ai.dto.GeneratedActivity;
+import com.tripplanner.ai.dto.GeneratedDay;
+import com.tripplanner.ai.dto.GeneratedItinerary;
 import com.tripplanner.exception.TripNotFoundException;
+import com.tripplanner.places.GeoPoint;
+import com.tripplanner.places.PlacesService;
+import com.tripplanner.trip.dto.GenerateTripRequest;
 import com.tripplanner.trip.dto.TripRequest;
 import com.tripplanner.trip.dto.TripResponse;
 import org.junit.jupiter.api.Test;
@@ -37,6 +43,9 @@ class TripServiceTest {
 
     @Mock
     private TripRepository tripRepository;
+
+    @Mock
+    private PlacesService placesService;
 
     @InjectMocks
     private TripService tripService;
@@ -128,6 +137,49 @@ class TripServiceTest {
 
         assertThrows(TripNotFoundException.class,
                 () -> tripService.getTripForUser(USER_A, TRIP_ID));
+    }
+
+    @Test
+    void persistGeneratedItinerary_geocodesItemsMissingCoordinates() {
+        when(placesService.geocode("Mystery Spot, Somewhere"))
+                .thenReturn(Optional.of(new GeoPoint(new BigDecimal("12.345"), new BigDecimal("67.890"))));
+        when(tripRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        GenerateTripRequest request = new GenerateTripRequest("Somewhere",
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 1),
+                2, new BigDecimal("500"), "RELAXED", List.of());
+        GeneratedItinerary itinerary = new GeneratedItinerary("Somewhere", List.of(
+                new GeneratedDay(1, List.of(new GeneratedActivity(
+                        "Mystery Spot", 60, new BigDecimal("5"), null, null)))));
+
+        TripResponse response = tripService.persistGeneratedItinerary(USER_A, request, itinerary);
+
+        assertEquals(0, new BigDecimal("12.345")
+                .compareTo(response.days().get(0).items().get(0).latitude()));
+        assertEquals(0, new BigDecimal("67.890")
+                .compareTo(response.days().get(0).items().get(0).longitude()));
+        // Geocoding is destination-hinted ("<name>, <destination>") so generic
+        // names resolve in the right city.
+        verify(placesService).geocode("Mystery Spot, Somewhere");
+    }
+
+    @Test
+    void persistGeneratedItinerary_keepsGeminiCoordinates() {
+        when(tripRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        GenerateTripRequest request = new GenerateTripRequest("Somewhere",
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 1),
+                2, new BigDecimal("500"), "RELAXED", List.of());
+        GeneratedItinerary itinerary = new GeneratedItinerary("Somewhere", List.of(
+                new GeneratedDay(1, List.of(new GeneratedActivity(
+                        "Known Place", 60, new BigDecimal("5"),
+                        new BigDecimal("1.11"), new BigDecimal("2.22"))))));
+
+        TripResponse response = tripService.persistGeneratedItinerary(USER_A, request, itinerary);
+
+        assertEquals(0, new BigDecimal("1.11")
+                .compareTo(response.days().get(0).items().get(0).latitude()));
+        verify(placesService, never()).geocode(any());
     }
 
     @Test

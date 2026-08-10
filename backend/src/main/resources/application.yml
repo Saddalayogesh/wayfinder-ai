@@ -39,6 +39,20 @@ gemini:
   base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
   timeout-ms: ${GEMINI_TIMEOUT_MS:60000}
 
+# Places provider: 'osm' (free OpenStreetMap Nominatim, no key) or 'google'
+# (needs GOOGLE_PLACES_API_KEY). The app is fully functional with zero paid
+# keys out of the box because 'osm' is the default.
+places:
+  provider: ${PLACES_PROVIDER:osm}
+  nominatim:
+    base-url: ${NOMINATIM_BASE_URL:https://nominatim.openstreetmap.org}
+    user-agent: ${NOMINATIM_USER_AGENT:AI-Trip-Planner/0.1}
+
+google:
+  places:
+    api-key: ${GOOGLE_PLACES_API_KEY:}
+    base-url: ${GOOGLE_PLACES_BASE_URL:https://places.googleapis.com}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

@@ -18,6 +18,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import java.io.IOException;
 
@@ -63,6 +64,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public: authentication endpoints, health probe, error dispatch
                         .requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
+                        // Place photos are proxied public bytes (the provider API key
+                        // never leaves the server) and are loaded by <img> tags, which
+                        // cannot send Authorization headers — so they stay unauthenticated.
+                        .requestMatchers(new AntPathRequestMatcher("/api/places/*/photo")).permitAll()
                         // Everything else under /api requires a valid JWT
                         .requestMatchers("/api/**").authenticated()
                         // Everything else is the SPA (static assets + client-side routes)

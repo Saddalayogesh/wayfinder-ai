@@ -1,10 +1,19 @@
 package com.tripplanner.user;
 
+import com.tripplanner.auth.AuthService;
+import com.tripplanner.user.dto.UpdateProfileRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,9 +30,11 @@ import java.util.List;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final AuthService authService;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, AuthService authService) {
         this.userRepository = userRepository;
+        this.authService = authService;
     }
 
     @GetMapping("/me")
@@ -34,6 +45,21 @@ public class UserController {
         // The JwtAuthenticationFilter stores the User entity as the principal.
         User user = (User) authentication.getPrincipal();
         return UserResponse.from(user);
+    }
+
+    @PutMapping("/me")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @Operation(summary = "Update my profile",
+            description = "Updates the signed-in user's name, and optionally the password (both currentPassword and newPassword are required to change it). Returns the refreshed profile.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile updated", content = @Content(schema = @Schema(implementation = UserResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Validation failed or current password is incorrect"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT")
+    })
+    public UserResponse updateMe(@Valid @RequestBody UpdateProfileRequest request,
+                                 Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return authService.updateProfile(user.getId(), request);
     }
 
     @GetMapping

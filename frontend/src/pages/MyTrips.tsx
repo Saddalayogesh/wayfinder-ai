@@ -8,22 +8,54 @@ import {
   getTrips,
   type Trip,
 } from '../services/tripService'
+import Badge from '../components/common/Badge'
+import Button from '../components/common/Button'
+import Card from '../components/common/Card'
+import ErrorState from '../components/common/ErrorState'
+import Skeleton from '../components/common/Skeleton'
 
 type LoadState = 'loading' | 'ready' | 'error'
+
+/** Skeleton trip-card grid shown while trips load. */
+function TripCardSkeleton() {
+  return (
+    <Card className="p-6">
+      <div className="flex items-start justify-between gap-3">
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <Skeleton className="mt-2 h-4 w-1/3" />
+      <div className="mt-5 space-y-2.5">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+        <Skeleton className="h-4 w-3/5" />
+      </div>
+      <div className="mt-5 flex gap-2 border-t border-slate-100 pt-4">
+        <Skeleton className="h-9 flex-1 rounded-lg" />
+        <Skeleton className="h-9 w-20 rounded-lg" />
+      </div>
+    </Card>
+  )
+}
 
 export default function MyTrips() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [state, setState] = useState<LoadState>('loading')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; status: number | null } | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setState('loading')
+    setError(null)
     try {
       setTrips(await getTrips())
       setState('ready')
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not load your trips.'))
+      const axiosError = err as { response?: { status?: number } }
+      setError({
+        message: getErrorMessage(err, 'Could not load your trips.'),
+        status: axiosError.response?.status ?? null,
+      })
       setState('error')
     }
   }, [])
@@ -39,7 +71,7 @@ export default function MyTrips() {
       await deleteTrip(trip.id)
       setTrips((current) => current.filter((t) => t.id !== trip.id))
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not delete the trip.'))
+      setError({ message: getErrorMessage(err, 'Could not delete the trip.'), status: null })
     } finally {
       setDeletingId(null)
     }
@@ -54,11 +86,8 @@ export default function MyTrips() {
             Every adventure you've started planning, in one place.
           </p>
         </div>
-        <Link
-          to="/trips/new"
-          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-700"
-        >
-          + New trip
+        <Link to="/trips/new">
+          <Button size="md">+ New trip</Button>
         </Link>
       </div>
 
@@ -67,15 +96,21 @@ export default function MyTrips() {
           role="alert"
           className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
         >
-          {error}
+          {error.message}
         </div>
       )}
 
       {state === 'loading' && (
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />
+            <TripCardSkeleton key={i} />
           ))}
+        </div>
+      )}
+
+      {state === 'error' && (
+        <div className="mt-10">
+          <ErrorState message={error?.message ?? ''} status={error?.status} onRetry={load} />
         </div>
       )}
 
@@ -88,11 +123,8 @@ export default function MyTrips() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
             Plan your first adventure and it will show up here as a card.
           </p>
-          <Link
-            to="/trips/new"
-            className="mt-6 inline-block rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            Plan your first trip
+          <Link to="/trips/new" className="mt-6 inline-block">
+            <Button>Plan your first trip</Button>
           </Link>
         </div>
       )}
@@ -100,15 +132,15 @@ export default function MyTrips() {
       {state === 'ready' && trips.length > 0 && (
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {trips.map((trip) => (
-            <article
+            <Card
               key={trip.id}
-              className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="group flex flex-col p-6 hover:-translate-y-1 hover:shadow-raised"
             >
               <div className="flex items-start justify-between gap-3">
                 <h2 className="text-xl font-bold text-slate-900">{trip.destination}</h2>
-                <span className="shrink-0 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                <Badge color="indigo" className="shrink-0">
                   {trip.travelStyle.replace(/_/g, ' ')}
-                </span>
+                </Badge>
               </div>
               <p className="mt-0.5 text-sm text-slate-500">{trip.title}</p>
 
@@ -134,37 +166,30 @@ export default function MyTrips() {
               {trip.interests.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {trip.interests.slice(0, 4).map((interest) => (
-                    <span
-                      key={interest}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-                    >
+                    <Badge key={interest} color="slate">
                       {interest}
-                    </span>
+                    </Badge>
                   ))}
                   {trip.interests.length > 4 && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-400">
-                      +{trip.interests.length - 4}
-                    </span>
+                    <Badge color="slate">+{trip.interests.length - 4}</Badge>
                   )}
                 </div>
               )}
 
               <div className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4">
-                <Link
-                  to={`/trips/${trip.id}`}
-                  className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  View itinerary
+                <Link to={`/trips/${trip.id}`} className="flex-1">
+                  <Button className="w-full">View itinerary</Button>
                 </Link>
-                <button
+                <Button
+                  variant="danger"
+                  loading={deletingId === trip.id}
+                  disabled={deletingId != null}
                   onClick={() => handleDelete(trip)}
-                  disabled={deletingId === trip.id}
-                  className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                 >
-                  {deletingId === trip.id ? 'Deleting…' : 'Delete'}
-                </button>
+                  Delete
+                </Button>
               </div>
-            </article>
+            </Card>
           ))}
         </div>
       )}

@@ -3,7 +3,46 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /*
+     * Design tokens — the app's palette, radii, shadows and spacing scale.
+     * Components in src/components/common consume these conventions.
+     */
+    /* Palette: primary = indigo 600 family, neutrals = slate */
+    --color-primary: #4f46e5;
+    --color-primary-hover: #4338ca;
+    --color-primary-soft: #eef2ff;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f8fafc;
+    --color-border: #e2e8f0;
+
+    /* Radii scale */
+    --radius-sm: 0.5rem; /*  8px — small controls   */
+    --radius-md: 0.75rem; /* 12px — inputs/buttons   */
+    --radius-lg: 1rem; /* 16px — cards             */
+
+    /* Shadows */
+    --shadow-card: 0 1px 3px rgb(15 23 42 / 0.08);
+    --shadow-raised: 0 10px 30px -12px rgb(15 23 42 / 0.25);
+
+    /* Spacing scale (page rhythm) */
+    --spacing-section: 4rem;
+    --spacing-page: 3.5rem;
+  }
+
   body {
-    @apply antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+
+  /* Typography scale — utility classes on elements always win over these. */
+  h1 {
+    @apply text-3xl font-extrabold tracking-tight text-slate-900;
+  }
+  h2 {
+    @apply text-xl font-bold tracking-tight text-slate-900;
+  }
+  ::selection {
+    background-color: var(--color-primary-soft);
+    color: var(--color-primary);
   }
 }

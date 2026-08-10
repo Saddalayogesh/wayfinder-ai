@@ -86,6 +86,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
     }
 
+    @ExceptionHandler(FavoriteNotFoundException.class)
+    public ResponseEntity<ApiError> handleFavoriteNotFound(FavoriteNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
     @ExceptionHandler(ItineraryGenerationException.class)
     public ResponseEntity<ApiError> handleItineraryGeneration(ItineraryGenerationException ex) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)

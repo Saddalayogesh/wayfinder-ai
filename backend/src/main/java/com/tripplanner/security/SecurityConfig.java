@@ -39,7 +39,8 @@ import java.io.IOException;
  *
  * <p>Route rules:</p>
  * <ul>
- *   <li>Public: {@code /api/auth/**} (register/login), {@code /api/health}, {@code /error}.</li>
+ *   <li>Public: {@code /api/auth/**} (register/login), {@code /api/health}, {@code /error},
+ *       and {@code /api/shared/**} (read-only shared trips via random token).</li>
  *   <li>Authenticated: every other {@code /api/**} route.</li>
  *   <li>Public: everything else — the React SPA (static assets + client-side
  *       fallback routes) and Swagger UI / OpenAPI docs ({@code /swagger-ui.html},
@@ -64,6 +65,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public: authentication endpoints, health probe, error dispatch
                         .requestMatchers("/api/auth/**", "/api/health", "/error").permitAll()
+                        // Public: read-only shared trips (access is guarded by the
+                        // random, non-guessable share token itself)
+                        .requestMatchers("/api/shared/**").permitAll()
                         // Place photos are proxied public bytes (the provider API key
                         // never leaves the server) and are loaded by <img> tags, which
                         // cannot send Authorization headers — so they stay unauthenticated.

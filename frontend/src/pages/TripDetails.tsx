@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import MapView, { type MapItem } from '../components/MapView'
 import TripForm from '../components/TripForm'
 import ErrorState from '../components/common/ErrorState'
+import Modal from '../components/common/Modal'
 import Skeleton from '../components/common/Skeleton'
 import { getErrorMessage } from '../services/api'
 import {
@@ -11,10 +12,12 @@ import {
   deleteDay,
   deleteItem,
   deleteTrip,
+  downloadTripPdf,
   formatCurrency,
   formatDate,
   getTrip,
   regenerateDay,
+  shareTrip,
   updateTrip,
   type ItineraryItemInput,
   type Trip,
@@ -50,6 +53,13 @@ export default function TripDetails() {
   const [regenerateDayNumber, setRegenerateDayNumber] = useState<number | null>(null)
   const [regenerateInstruction, setRegenerateInstruction] = useState('')
   const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null)
+
+  // Sharing + PDF export.
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [downloadBusy, setDownloadBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -203,6 +213,61 @@ export default function TripDetails() {
     }
   }
 
+  /** Generates (or returns the existing) share token and opens the link modal. */
+  const handleShare = async () => {
+    if (!id || shareBusy) return
+    setShareBusy(true)
+    setError(null)
+    try {
+      const { shareUrl: url } = await shareTrip(id)
+      setShareUrl(url)
+      setShareCopied(false)
+      setShareOpen(true)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not create the share link.'))
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareCopied(true)
+      window.setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable (e.g. non-secure context): select the text so
+      // the user can copy manually.
+      const input = document.getElementById('share-url-input') as HTMLInputElement | null
+      input?.select()
+    }
+  }
+
+  /** Streams the owner-only PDF and saves it to disk. */
+  const handleDownloadPdf = async () => {
+    if (!id || !trip || downloadBusy) return
+    setDownloadBusy(true)
+    setError(null)
+    try {
+      const blob = await downloadTripPdf(id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `trip-${id}-${trip.destination.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      // Revoke on a later tick — revoking synchronously can cancel the
+      // in-flight download in some browsers (notably Firefox).
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not download the PDF.'))
+    } finally {
+      setDownloadBusy(false)
+    }
+  }
+
   /** Gemini re-plans one day; every other day stays untouched. */
   const handleRegenerate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -331,7 +396,21 @@ export default function TripDetails() {
                 {trip.travelers === 1 ? 'traveler' : 'travelers'} · {formatCurrency(trip.budget)}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleShare}
+                disabled={busy || shareBusy}
+                className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+              >
+                {shareBusy ? '…' : '🔗 Share'}
+              </button>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={busy || downloadBusy}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                {downloadBusy ? '…' : '⬇ PDF'}
+              </button>
               <button
                 onClick={() => setEditing(true)}
                 disabled={busy}
@@ -674,6 +753,40 @@ export default function TripDetails() {
           </section>
         </div>
       )}
+
+      {/* Share link modal */}
+      <Modal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title="Share this trip"
+        footer={
+          <button
+            type="button"
+            onClick={handleCopyShareLink}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            {shareCopied ? 'Copied ✓' : 'Copy link'}
+          </button>
+        }
+      >
+        <p className="text-sm text-slate-500">
+          Anyone with this link can view the trip read-only — no sign-in needed. You can
+          revoke it by… well, you can’t yet. Share wisely. 😄
+        </p>
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+          <input
+            id="share-url-input"
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="w-full bg-transparent text-sm text-slate-700 focus:outline-none"
+          />
+        </div>
+        <p className="mt-3 text-xs text-slate-400">
+          Opens at /shared/trips/&lt;token&gt; — the same page works for signed-in and signed-out
+          visitors.
+        </p>
+      </Modal>
 
       {/* Regenerate-day modal */}
       {regenerateDayNumber != null && (

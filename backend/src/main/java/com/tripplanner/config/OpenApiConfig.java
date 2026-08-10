@@ -5,6 +5,9 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.tags.Tag;
+
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -45,6 +48,15 @@ public class OpenApiConfig {
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
                                         .description("Paste your JWT from POST /api/auth/login here.")))
-                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
+                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
+                .tags(List.of(
+                        new Tag().name("Auth").description("Public account creation and sign-in"),
+                        new Tag().name("Trips").description("Trip CRUD and itinerary management (JWT required)"),
+                        new Tag().name("AI").description("Gemini-powered itinerary generation and day regeneration"),
+                        new Tag().name("Places").description("Place search and details from the active provider"),
+                        new Tag().name("Favorites").description("User-scoped saved places"),
+                        new Tag().name("Sharing").description("Public read-only trip sharing via random token"),
+                        new Tag().name("Users").description("Profile and role-scoped user endpoints"),
+                        new Tag().name("Admin").description("Operational endpoints — ADMIN role required")));
     }
 }

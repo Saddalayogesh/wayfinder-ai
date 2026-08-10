@@ -15,8 +15,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,9 +41,51 @@ public class TripService {
     private final TripRepository tripRepository;
     private final PlacesService placesService;
 
+    /** Cryptographically strong randomness for share tokens. */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    /** 24 random bytes -> 48 hex chars: plenty of entropy for a bearer-style token. */
+    private static final int SHARE_TOKEN_BYTES = 24;
+
     public TripService(TripRepository tripRepository, PlacesService placesService) {
         this.tripRepository = tripRepository;
         this.placesService = placesService;
+    }
+
+    // --- Sharing ---------------------------------------------------------------
+
+    /**
+     * Creates (or returns the existing) random share token for a trip. Only the
+     * owner may share a trip (403 otherwise).
+     */
+    @Transactional
+    public String createShareToken(Long userId, Long tripId) {
+        Trip trip = getOwnedTrip(tripId, userId);
+        if (trip.getShareToken() == null) {
+            trip.setShareToken(newShareToken());
+            // Explicit save: in production the transaction's dirty checking
+            // would flush this anyway, but saving here keeps the unit-testable
+            // contract obvious (token is persisted immediately).
+            tripRepository.save(trip);
+        }
+        return trip.getShareToken();
+    }
+
+    /**
+     * Read-only access to a shared trip via its token — deliberately no
+     * ownership check: anyone holding the token may view it.
+     */
+    @Transactional(readOnly = true)
+    public TripResponse getSharedTrip(String token) {
+        Trip trip = tripRepository.findByShareToken(token)
+                .orElseThrow(() -> new TripNotFoundException("Shared trip not found"));
+        return TripResponse.from(trip);
+    }
+
+    private static String newShareToken() {
+        byte[] bytes = new byte[SHARE_TOKEN_BYTES];
+        SECURE_RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
     @Transactional

@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import MyTrips from './pages/MyTrips'
 import CreateTrip from './pages/CreateTrip'
 import TripDetails from './pages/TripDetails'
+import SharedTrip from './pages/SharedTrip'
 import Favorites from './pages/Favorites'
 import Profile from './pages/Profile'
 
@@ -54,6 +55,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Public read-only shared trips — no JWT needed */}
+            <Route path="/shared/trips/:token" element={<SharedTrip />} />
             <Route
               path="/favorites"
               element={

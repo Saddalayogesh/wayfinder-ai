@@ -3,6 +3,7 @@ package com.tripplanner.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tripplanner.exception.ItineraryGenerationException;
+import com.tripplanner.exception.ServiceUnavailableException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -84,10 +85,12 @@ public class GeminiClient {
                     .retrieve()
                     .body(String.class);
         } catch (RestClientResponseException e) {
+            // The API responded, but with an error status: 502 (bad upstream).
             throw new ItineraryGenerationException(
                     "Gemini API returned an error (HTTP " + e.getStatusCode().value() + ")");
         } catch (ResourceAccessException e) {
-            throw new ItineraryGenerationException(
+            // Network failure / timeout: the dependency is unreachable -> 503.
+            throw new ServiceUnavailableException(
                     "Could not reach the Gemini API or the request timed out.");
         }
 

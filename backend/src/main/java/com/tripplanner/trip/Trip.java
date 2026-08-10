@@ -63,6 +63,14 @@ public class Trip {
     @Column(nullable = false, length = 50)
     private String travelStyle;
 
+    /**
+     * Random, non-guessable token enabling read-only access via
+     * {@code GET /api/shared/trips/{token}} without authentication. Null until
+     * the owner shares the trip; unique across all trips.
+     */
+    @Column(name = "share_token", unique = true, length = 64)
+    private String shareToken;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @BatchSize(size = 30)
     @CollectionTable(name = "trip_interests", joinColumns = @JoinColumn(name = "trip_id"))
@@ -163,6 +171,14 @@ public class Trip {
 
     public void setTravelStyle(String travelStyle) {
         this.travelStyle = travelStyle;
+    }
+
+    public String getShareToken() {
+        return shareToken;
+    }
+
+    public void setShareToken(String shareToken) {
+        this.shareToken = shareToken;
     }
 
     public Set<String> getInterests() {

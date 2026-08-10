@@ -17,6 +17,20 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+  # Caching for place enrichment data only (never trips — those are
+  # user-specific and mutate often).
+  #   CACHE_TYPE=simple  -> in-memory ConcurrentMap (zero setup, default)
+  #   CACHE_TYPE=redis   -> Redis via the connection below
+  cache:
+    type: ${CACHE_TYPE:simple}
+
+  data:
+    redis:
+      # Host/port come from env vars so they match the 'redis' service name
+      # used in docker-compose (localhost works for a locally-mapped port).
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
 # JWT signing configuration. The default secret is for local development
 # only — override JWT_SECRET with a strong random value in production.
 app:

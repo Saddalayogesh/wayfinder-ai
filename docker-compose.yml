@@ -1,0 +1,12 @@
+# Optional infrastructure for local development. The Spring Boot backend
+# reads REDIS_HOST/REDIS_PORT (defaults: localhost/6379) — with this file's
+# port mapping, plain `docker compose up redis` makes Redis available on
+# localhost:6379. Then start the backend with CACHE_TYPE=redis to enable
+# Redis-backed caching of place enrichment data.
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-trip-planner-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,8 +44,12 @@ public class PlacesController {
     }
 
     @GetMapping("/search")
+    // Empty results are NOT cached: a transient provider outage (or an
+    // unknown place) must not poison the cache for 24h and mask recovery.
+    @Cacheable(value = "places", key = "#destination", unless = "#result == null || #result.isEmpty()")
     @Operation(summary = "Search places",
-            description = "Searches the active places provider for a destination or place name. Returns up to 'limit' results with coordinates.")
+            description = "Searches the active places provider for a destination or place name. Returns up to 'limit' results with coordinates. "
+                    + "Results are cached for 24h by destination so repeated searches don't re-hit the external provider.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of matching places (possibly empty)"),
             @ApiResponse(responseCode = "400", description = "Missing or invalid query"),

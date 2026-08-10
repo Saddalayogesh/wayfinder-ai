@@ -81,6 +81,18 @@ export async function getMe(): Promise<StoredUser> {
   return data
 }
 
+/** Profile update: change the name and optionally the password. */
+export interface ProfileUpdate {
+  name: string
+  currentPassword?: string
+  newPassword?: string
+}
+
+export async function updateMe(input: ProfileUpdate): Promise<StoredUser> {
+  const { data } = await api.put<StoredUser>('/users/me', input)
+  return data
+}
+
 /** Extracts a human-readable message from an unknown error (e.g. an axios 4xx). */
 export function getErrorMessage(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (axios.isAxiosError(err)) {

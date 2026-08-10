@@ -18,6 +18,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
+  /** Replaces the stored user profile (e.g. after a profile update). */
+  updateUser: (user: StoredUser) => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -44,6 +46,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth(null)
   }, [])
 
+  const updateUser = useCallback((user: StoredUser) => {
+    setAuth((current) => {
+      if (!current) return current
+      const next: StoredAuth = { ...current, user }
+      saveAuth(next)
+      return next
+    })
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: auth?.user ?? null,
@@ -52,8 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateUser,
     }),
-    [auth, login, register, logout],
+    [auth, login, register, logout, updateUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

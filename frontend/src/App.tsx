@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard'
 import MyTrips from './pages/MyTrips'
 import CreateTrip from './pages/CreateTrip'
 import TripDetails from './pages/TripDetails'
+import Favorites from './pages/Favorites'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -49,6 +51,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <TripDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/favorites"
+              element={
+                <ProtectedRoute>
+                  <Favorites />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

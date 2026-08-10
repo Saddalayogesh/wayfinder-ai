@@ -31,8 +31,11 @@ public class OpenApiConfig {
                         .description("""
                                 Backend API for the AI Trip Planner monolith.
 
-                                JWT bearer authentication is pre-configured for
-                                future phases and is not required yet.
+                                Authentication is JWT bearer-based. Register or sign in via
+                                POST /api/auth/register or POST /api/auth/login, copy the
+                                returned token, click \"Authorize\" above and paste it. The
+                                auth and health endpoints are public; every other /api/**
+                                route requires a valid token.
                                 """)
                         .version("1.0.0"))
                 .components(new Components()
@@ -41,7 +44,7 @@ public class OpenApiConfig {
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
-                                        .description("Enter your JWT token here (not required yet).")))
+                                        .description("Paste your JWT from POST /api/auth/login here.")))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
     }
 }

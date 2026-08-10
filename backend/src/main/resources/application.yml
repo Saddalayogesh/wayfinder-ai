@@ -5,38 +5,24 @@ spring:
   application:
     name: ai-trip-planner
 
-  # ---------------------------------------------------------------------
-  # No database in this phase yet. Spring Boot 3.5 auto-configures a Hikari
-  # DataSource whenever a JDBC driver (mysql-connector-j) is on the
-  # classpath, so the JDBC/JPA auto-configurations are excluded below to
-  # keep the app bootable without MySQL.
-  #
-  # >>> When you enable MySQL (uncomment the block further down),
-  # >>> DELETE this exclude list. <<<
-  # ---------------------------------------------------------------------
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_trip_planner?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    # Local development default only — override via DB_PASSWORD (or better,
+    # an environment variable / secret manager) in production.
+    password: ${DB_PASSWORD:Yogesh@123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
 
-  # =====================================================================
-  # MySQL connection placeholders.
-  #
-  # The block below is intentionally commented out so the application boots
-  # without a running database (the current phase has no entities yet).
-  # Uncomment it when you are ready to wire up JPA, then start MySQL:
-  #
-  #   spring:
-  #     datasource:
-  #       url: ${DB_URL:jdbc:mysql://localhost:3306/ai_trip_planner?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
-  #       username: ${DB_USERNAME:root}
-  #       password: ${DB_PASSWORD:root}
-  #       driver-class-name: com.mysql.cj.jdbc.Driver
-  #     jpa:
-  #       hibernate:
-  #         ddl-auto: update
-  #       open-in-view: false
-  # =====================================================================
+# JWT signing configuration. The default secret is for local development
+# only — override JWT_SECRET with a strong random value in production.
+app:
+  jwt:
+    secret: ${JWT_SECRET:TonncSZLaN4gggtvHuzDet44Uh6YSTF20h12GnSPcmIjow5hdkJDR7CCGE9k4Ta9}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 springdoc:
   swagger-ui:

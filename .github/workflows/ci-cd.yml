@@ -14,6 +14,7 @@ jobs:
   build:
     name: Test, package, and build the Docker image
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,29 +23,34 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: "21"
           cache: maven
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Backend tests (JUnit 5 + MockMvc, in-memory H2)
-        run: cd backend && mvn -B test
+      - name: Backend tests
+        working-directory: backend
+        run: mvn -B test
 
-      - name: Frontend tests (Vitest + React Testing Library)
-        run: cd frontend && npm ci && npm test
+      - name: Frontend tests
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
 
-      - name: Package the executable JAR (React SPA embedded)
-        run: cd backend && mvn -B package -DskipTests
+      - name: Package the executable JAR
+        working-directory: backend
+        run: mvn -B package -DskipTests
 
       - name: Validate docker-compose config
         run: docker compose config --quiet
 
-      - name: Build the Docker image (multi-stage: node -> maven -> JRE)
+      - name: Build the Docker image
         uses: docker/build-push-action@v6
         with:
           context: .

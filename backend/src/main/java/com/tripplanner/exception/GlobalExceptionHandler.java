@@ -60,6 +60,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(HttpStatus.CONFLICT, ex.getMessage()));
     }
 
+    @ExceptionHandler(TripNotFoundException.class)
+    public ResponseEntity<ApiError> handleTripNotFound(TripNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiError.of(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
     /**
      * Safety net for the (rare) concurrent-duplicate-registration race where
      * the unique constraint fires before {@link EmailAlreadyExistsException}.

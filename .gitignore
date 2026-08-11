@@ -1,0 +1,19 @@
+# --- Dependencies ---
+node_modules/
+
+# --- Build output ---
+target/
+dist/
+*.log
+
+# --- Environment ---
+.env
+.env.*
+!.env.example
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useTheme, type Theme } from '../context/ThemeContext'
 
 /** An item the map can pin. Items without latitude/longitude are skipped. */
 export interface MapItem {
@@ -23,10 +24,16 @@ interface MapViewProps {
   highlightedId: number | null
   /** Called when a marker is clicked. */
   onSelectItem: (id: number) => void
+  /** ISO-4217 currency code for cost popups (defaults to USD). */
+  currency?: string
   className?: string
 }
 
-const PIN_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+/**
+ * Day-pin palette — mirrors the --pin-* CSS variables in index.css, which are
+ * derived from the primary/accent design tokens (no extra hex values).
+ */
+const PIN_COLORS = ['var(--pin-1)', 'var(--pin-2)', 'var(--pin-3)', 'var(--pin-4)', 'var(--pin-5)', 'var(--pin-6)']
 
 function pinColor(dayNumber: number | null | undefined): string {
   if (dayNumber == null) return PIN_COLORS[0]
@@ -38,10 +45,10 @@ function createIcon(item: MapItem): L.DivIcon {
   const label = item.dayNumber != null ? String(item.dayNumber) : ''
   return L.divIcon({
     className: 'trip-marker',
-    html: `<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);color:#fff;font-weight:700;font-size:11px;font-family:ui-sans-serif,system-ui,sans-serif">${label}</span></div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 26],
-    popupAnchor: [0, -26],
+    html: `<div class="trip-pin" style="background:${color}"><span>${label}</span></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -30],
   })
 }
 
@@ -53,41 +60,55 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;')
 }
 
-function popupHtml(item: MapItem): string {
-  const parts: string[] = []
-  parts.push(
-    `<div style="font-weight:700;font-size:13px;font-family:ui-sans-serif,system-ui,sans-serif">${escapeHtml(item.name)}</div>`,
-  )
+function popupHtml(item: MapItem, currency: string): string {
+  const parts: string[] = ['<div class="trip-popup">']
+  parts.push(`<div class="trip-popup__name">${escapeHtml(item.name)}</div>`)
   if (item.photoUrl) {
     parts.push(
-      `<img src="${escapeHtml(item.photoUrl)}" alt="" style="width:100%;max-width:220px;border-radius:6px;margin-top:4px" loading="lazy" />`,
+      `<img src="${escapeHtml(item.photoUrl)}" alt="" class="trip-popup__thumb" loading="lazy" />`,
     )
   }
   if (item.rating != null) {
-    parts.push(`<div style="color:#b45309;font-size:12px">★ ${Number(item.rating).toFixed(1)}</div>`)
+    parts.push(`<div class="trip-popup__rating">★ ${Number(item.rating).toFixed(1)}</div>`)
   }
   if (item.description) {
-    parts.push(`<div style="color:#64748b;font-size:12px;margin-top:2px">${escapeHtml(item.description)}</div>`)
+    parts.push(`<div class="trip-popup__desc">${escapeHtml(item.description)}</div>`)
   }
   const meta: string[] = []
   if (item.dayNumber != null) meta.push(`Day ${item.dayNumber}`)
   if (item.estimatedCost != null) {
     meta.push(
-      new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(item.estimatedCost),
+      new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(item.estimatedCost),
     )
   }
   if (item.visitDuration != null) meta.push(`${item.visitDuration}m`)
   if (meta.length > 0) {
-    parts.push(`<div style="color:#94a3b8;font-size:11px;margin-top:2px">${meta.join(' · ')}</div>`)
+    parts.push(`<div class="trip-popup__meta">${meta.join(' · ')}</div>`)
   }
+  parts.push('</div>')
   return parts.join('')
 }
 
+/** CARTO basemap per theme — dark tiles at night, light tiles for light mode. */
+function tileUrl(theme: Theme): string {
+  return theme === 'dark'
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+}
+
 /**
- * Interactive map for itinerary items using Leaflet + OpenStreetMap tiles.
- * Items without coordinates are skipped gracefully — they simply get no marker.
+ * Interactive map for itinerary items using Leaflet + CARTO tiles (dark or
+ * light to match the active theme). Items without coordinates are skipped
+ * gracefully — they simply get no marker.
  */
-export default function MapView({ items, highlightedId, onSelectItem, className }: MapViewProps) {
+export default function MapView({
+  items,
+  highlightedId,
+  onSelectItem,
+  currency = 'USD',
+  className,
+}: MapViewProps) {
+  const { theme } = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<number, L.Marker>>(new Map())
@@ -96,14 +117,10 @@ export default function MapView({ items, highlightedId, onSelectItem, className 
   onSelectRef.current = onSelectItem
   highlightRef.current = highlightedId
 
-  // Create the map once.
+  // Create the map once (tile layer is added below so it can follow theme).
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current).setView([20, 0], 2)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map)
     mapRef.current = map
     return () => {
       map.remove()
@@ -112,7 +129,22 @@ export default function MapView({ items, highlightedId, onSelectItem, className 
     }
   }, [])
 
-  // Rebuild markers whenever the items change.
+  // Tile layer follows the theme — swap the basemap whenever it flips.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    map.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer) layer.remove()
+    })
+    L.tileLayer(tileUrl(theme), {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19,
+      subdomains: 'abcd',
+    }).addTo(map)
+  }, [theme])
+
+  // Rebuild markers whenever the items or currency change.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -127,7 +159,7 @@ export default function MapView({ items, highlightedId, onSelectItem, className 
       const latlng: L.LatLngExpression = [item.latitude, item.longitude]
       bounds.push(latlng)
       const marker = L.marker(latlng, { icon: createIcon(item) })
-        .bindPopup(popupHtml(item))
+        .bindPopup(popupHtml(item, currency), { closeButton: true, minWidth: 232, maxWidth: 232 })
         .on('click', () => onSelectRef.current(item.id))
       marker.addTo(map)
       markersRef.current.set(item.id, marker)
@@ -149,7 +181,7 @@ export default function MapView({ items, highlightedId, onSelectItem, className 
         map.panTo(marker.getLatLng())
       }
     }
-  }, [items])
+  }, [items, currency])
 
   // Open/pan to the highlighted marker; close others.
   useEffect(() => {
@@ -168,8 +200,8 @@ export default function MapView({ items, highlightedId, onSelectItem, className 
   return (
     <div
       ref={containerRef}
-      className={`z-0 overflow-hidden rounded-xl border border-slate-200 ${className ?? ''}`}
-      style={{ height: '100%', minHeight: 340 }}
+      className={`relative z-0 overflow-hidden rounded-2xl border border-border/70 ${className ?? ''}`}
+      style={{ height: '100%', minHeight: 360 }}
       aria-label="Map of itinerary places"
     />
   )

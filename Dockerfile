@@ -1,4 +1,4 @@
-# AI Trip Planner — single monolithic image.
+# Wayfinder AI — single monolithic image.
 #
 # One build produces ONE image with ONE container that serves both the React
 # SPA and the Spring Boot REST API on port 8080. There is deliberately no
@@ -36,10 +36,20 @@ RUN cd backend && mvn -B package -Dmaven.test.skip=true \
 # ---------- Stage 3: slim runtime --------------------------------------------
 FROM eclipse-temurin:21-jre-jammy AS runtime
 WORKDIR /app
+# Install curl for the container healthcheck — the base JRE image ships no
+# HTTP client tool (neither curl nor wget), so add it explicitly.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 # Run as a non-root user.
 RUN groupadd --system app && useradd --system --gid app app
-COPY --from=backend-build --chown=app:app /workspace/backend/target/ai-trip-planner-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=backend-build --chown=app:app /workspace/backend/target/wayfinder-ai-0.0.1-SNAPSHOT.jar app.jar
 USER app
 EXPOSE 8080
 ENV JAVA_OPTS=""
+# Report the container healthy once the Spring Boot API answers on the public
+# /api/health probe (permitAll in SecurityConfig). Keep in sync with the
+# healthcheck defined for the 'app' service in docker-compose.yml.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD curl -fsS http://localhost:8080/api/health || exit 1
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

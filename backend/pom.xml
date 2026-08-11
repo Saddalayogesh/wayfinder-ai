@@ -12,10 +12,10 @@
     </parent>
 
     <groupId>com.tripplanner</groupId>
-    <artifactId>ai-trip-planner</artifactId>
+    <artifactId>wayfinder-ai</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>ai-trip-planner</name>
-    <description>AI Trip Planner — monolithic Spring Boot backend serving a React SPA</description>
+    <name>wayfinder-ai</name>
+    <description>Wayfinder AI — monolithic Spring Boot backend serving a React SPA</description>
 
     <properties>
         <!-- LTS baseline: matches the CI runner and the Docker runtime image. -->

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { cn } from '../../utils/cn'
+import { X } from 'lucide-react'
 
 interface ModalProps {
   open: boolean
@@ -11,7 +12,8 @@ interface ModalProps {
   className?: string
 }
 
-/** Accessible modal: closes on backdrop click and on Escape. */
+/** Accessible modal: closes on backdrop click and on Escape, with a soft
+ *  fade + scale entrance matching the design system. */
 export default function Modal({ open, onClose, title, children, footer, className }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -34,7 +36,7 @@ export default function Modal({ open, onClose, title, children, footer, classNam
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -46,24 +48,25 @@ export default function Modal({ open, onClose, title, children, footer, classNam
         aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl outline-none',
+          'w-full max-w-md animate-modal-in rounded-2xl border border-border bg-surface p-6 shadow-panel outline-none',
+          // Keep tall dialogs (e.g. regenerate) scrollable on small screens.
+          // (100vh first as a fallback for browsers without dvh support.)
+          'max-h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto',
           className,
         )}
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-text">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1.5 text-muted transition-colors duration-200 hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           >
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-            </svg>
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="mt-4 text-text/90">{children}</div>
         {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
       </div>
     </div>

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getErrorMessage, getMe } from '../services/api'
+import Button from '../components/common/Button'
+import Badge from '../components/common/Badge'
+import { ArrowRight, Compass, LogOut } from 'lucide-react'
 
 type ApiCheck = 'loading' | 'ok' | 'error'
 
@@ -33,95 +36,97 @@ export default function Dashboard() {
   }
 
   const firstName = user?.name.split(' ')[0] ?? 'there'
-  const roleBadge =
-    user?.role === 'ADMIN'
-      ? 'bg-violet-100 text-violet-700'
-      : 'bg-indigo-100 text-indigo-700'
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Welcome back, {firstName} 👋
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              This is your dashboard — trip planning features land here in the next phase.
-            </p>
+    <main className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
+      <div className="panel p-7 sm:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="flex items-start gap-4">
+            <span className="btn-primary-bg flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold text-white ring-2 ring-primary/30">
+              {(user?.name ?? '?').charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <h1 className="font-display text-3xl font-normal tracking-tight text-text sm:text-4xl">
+                Welcome back, {firstName}
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Here's a snapshot of your travel planning.
+              </p>
+            </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-          >
+          <Button variant="ghost" onClick={handleLogout}>
+            <LogOut size={16} aria-hidden="true" />
             Sign out
-          </button>
+          </Button>
         </div>
 
-        <dl className="mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Name</dt>
-            <dd className="mt-1 truncate text-sm font-semibold text-slate-900">{user?.name}</dd>
+        <dl className="mt-10 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-border/60 bg-background/40 p-5 transition-colors duration-200 hover:border-primary/25">
+            <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Name</dt>
+            <dd className="mt-2 truncate text-lg font-medium text-text">{user?.name}</dd>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Email</dt>
-            <dd className="mt-1 truncate text-sm font-semibold text-slate-900">{user?.email}</dd>
+          <div className="rounded-xl border border-border/60 bg-background/40 p-5 transition-colors duration-200 hover:border-primary/25">
+            <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Email</dt>
+            <dd className="mt-2 truncate text-lg font-medium text-text">{user?.email}</dd>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt>
-            <dd className="mt-1">
-              <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleBadge}`}>
-                {user?.role ?? '—'}
-              </span>
+          <div className="rounded-xl border border-border/60 bg-background/40 p-5 transition-colors duration-200 hover:border-primary/25">
+            <dt className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Role</dt>
+            <dd className="mt-2">
+              <Badge color={user?.role === 'ADMIN' ? 'violet' : 'primary'}>
+                {user?.role ?? 'USER'}
+              </Badge>
             </dd>
           </div>
         </dl>
 
         {/* Shortcut into trip management */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-indigo-50 p-4">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Plan a trip</h2>
-            <p className="mt-0.5 text-sm text-slate-600">
-              Create and manage your trips — itineraries land here soon.
-            </p>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/10 p-6">
+          <div className="flex items-center gap-4">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/20 text-primary">
+              <Compass size={22} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-text">Plan a trip</h2>
+              <p className="mt-0.5 text-sm text-muted">
+                Create and manage your trips, or let AI draft the whole itinerary.
+              </p>
+            </div>
           </div>
-          <Link
-            to="/trips"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            My trips
+          <Link to="/trips/new">
+            <Button>
+              Plan my trip
+              <ArrowRight size={16} aria-hidden="true" />
+            </Button>
           </Link>
         </div>
 
         {/* Live check that the JWT authenticates against the backend */}
-        <div className="mt-8 rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center gap-3">
+        <div className="mt-8 rounded-xl border border-border/60 bg-background/40 p-6">
+          <div className="flex flex-wrap items-center gap-3">
             <span
               aria-hidden="true"
               className={`h-2.5 w-2.5 rounded-full ${
                 check === 'ok'
-                  ? 'bg-emerald-500'
+                  ? 'bg-success'
                   : check === 'error'
-                    ? 'bg-rose-500'
+                    ? 'bg-error'
                     : 'bg-amber-400 animate-pulse'
               }`}
             />
-            <h2 className="text-sm font-semibold text-slate-900">Protected API check</h2>
-            <span className="ml-auto font-mono text-xs text-slate-400">GET /api/users/me</span>
+            <h2 className="text-sm font-semibold text-text">Protected API check</h2>
+            <span className="ml-auto font-mono text-xs text-muted">GET /api/users/me</span>
           </div>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-3 text-sm leading-relaxed text-muted">
             {check === 'loading' && 'Verifying your JWT against the backend…'}
             {check === 'ok' && (
               <>
                 Authenticated as{' '}
-                <span className="font-semibold text-slate-900">{profile?.email}</span> — your Bearer
-                token was accepted. ✅
+                <span className="font-medium text-text">{profile?.email}</span> — your Bearer
+                token was accepted.
               </>
             )}
             {check === 'error' && (
-              <span className="text-rose-600">
-                The authenticated request failed: {checkError}
-              </span>
+              <span className="text-error">The authenticated request failed: {checkError}</span>
             )}
           </p>
         </div>

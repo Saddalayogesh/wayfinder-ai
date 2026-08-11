@@ -18,6 +18,7 @@ public record TripResponse(
         LocalDate endDate,
         Integer travelers,
         BigDecimal budget,
+        String currency,
         String travelStyle,
         Set<String> interests,
         List<TripDayResponse> days,
@@ -29,7 +30,7 @@ public record TripResponse(
         return new TripResponse(
                 trip.getId(), trip.getTitle(), trip.getDestination(),
                 trip.getStartDate(), trip.getEndDate(), trip.getTravelers(), trip.getBudget(),
-                trip.getTravelStyle(), Set.copyOf(trip.getInterests()),
+                trip.getCurrency(), trip.getTravelStyle(), Set.copyOf(trip.getInterests()),
                 trip.getDays().stream().map(TripDayResponse::from).toList(),
                 CostBreakdown.from(trip),
                 trip.getCreatedAt(), trip.getUpdatedAt());

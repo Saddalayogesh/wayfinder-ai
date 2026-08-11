@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -49,8 +50,20 @@ public record GenerateTripRequest(
 
         @Schema(example = "[\"Food\",\"Culture\"]")
         @Size(max = 20, message = "At most 20 interests are allowed")
-        List<@Size(max = 50, message = "Each interest must be at most 50 characters") String> interests
+        List<@Size(max = 50, message = "Each interest must be at most 50 characters") String> interests,
+
+        @Schema(example = "USD", description = "Optional ISO-4217 currency code for costs and the budget; defaults to USD")
+        @Size(max = 10, message = "Currency must be at most 10 characters")
+        @Pattern(regexp = "^[A-Za-z]{3}$", message = "Currency must be a 3-letter ISO-4217 code")
+        String currency
 ) {
+    /** Convenience constructor for callers that don't set a currency (defaults to USD). */
+    public GenerateTripRequest(String destination, LocalDate startDate, LocalDate endDate,
+                               Integer travelers, BigDecimal budget, String travelStyle,
+                               List<String> interests) {
+        this(destination, startDate, endDate, travelers, budget, travelStyle, interests, null);
+    }
+
     @AssertTrue(message = "endDate must be on or after startDate")
     public boolean isDateRangeValid() {
         return startDate == null || endDate == null || !startDate.isAfter(endDate);

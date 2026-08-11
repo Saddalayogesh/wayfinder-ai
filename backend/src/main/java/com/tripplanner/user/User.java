@@ -15,7 +15,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 
 /**
- * A registered user of the AI Trip Planner.
+ * A registered user of Wayfinder AI.
  *
  * <p>The password column stores a BCrypt hash — never the raw password.</p>
  */

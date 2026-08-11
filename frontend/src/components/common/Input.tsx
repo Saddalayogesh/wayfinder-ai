@@ -14,7 +14,10 @@ export default function Input({ label, error, hint, id, className, ...rest }: In
   return (
     <div>
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
+        <label
+          htmlFor={inputId}
+          className="block text-[13px] font-medium tracking-[0.02em] text-muted"
+        >
           {label}
         </label>
       )}
@@ -22,20 +25,18 @@ export default function Input({ label, error, hint, id, className, ...rest }: In
         id={inputId}
         aria-invalid={error ? true : undefined}
         className={cn(
-          'mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2',
-          error
-            ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
-            : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-200',
+          'input mt-2',
+          error ? 'border-error/40 focus:shadow-[0_0_0_3px_rgb(var(--color-error)_/_0.15)]' : '',
           className,
         )}
         {...rest}
       />
       {error ? (
-        <p role="alert" className="mt-1 text-xs text-rose-600">
+        <p role="alert" className="mt-1.5 text-xs text-error">
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-400">{hint}</p>
+        <p className="mt-1.5 text-xs text-muted">{hint}</p>
       ) : null}
     </div>
   )

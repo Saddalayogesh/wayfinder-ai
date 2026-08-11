@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Cancel stale runs for the same branch/PR — saves CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -14,7 +19,7 @@ jobs:
   build:
     name: Test, package, and build the Docker image
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,19 +48,26 @@ jobs:
           npm ci
           npm test
 
-      - name: Package the executable JAR
-        working-directory: backend
-        run: mvn -B package -DskipTests
+      - name: Frontend typecheck and production build (tsc + vite)
+        run: cd frontend && npm run build
+
+      # frontend/dist was already produced by the build step above, so skip
+      # frontend-maven-plugin's Node download/install/build (same flags the
+      # Dockerfile uses) — the SPA is embedded from the existing dist.
+      - name: Package the executable JAR (React SPA embedded)
+        run: cd backend && mvn -B package -DskipTests -Dskip.installnodenpm=true -Dskip.npm=true -Dskip.npx=true
 
       - name: Validate docker-compose config
         run: docker compose config --quiet
 
-      - name: Build the Docker image
+      # Quoted: the colon inside “multi-stage:” is a YAML mapping indicator
+      # in a plain scalar and previously made this whole workflow invalid.
+      - name: "Build the Docker image (multi-stage: node -> maven -> JRE)"
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          tags: ai-trip-planner:ci
+          tags: wayfinder-ai:ci
 
       - name: Log in to GitHub Container Registry
         if: github.ref == 'refs/heads/main'

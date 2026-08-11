@@ -2,6 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getErrorMessage } from '../services/api'
+import Button from '../components/common/Button'
+import BrandMark from '../components/common/BrandMark'
+import AuthLayout from '../components/AuthLayout'
+
+const inputClass = 'input mt-2'
 
 export default function Register() {
   const { register, isAuthenticated } = useAuth()
@@ -32,28 +37,36 @@ export default function Register() {
     }
   }
 
-  const inputClass =
-    'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200'
-
   return (
-    <main className="flex items-center justify-center px-4 py-20">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-      >
-        <h1 className="text-2xl font-bold text-slate-900">Create your account</h1>
-        <p className="mt-1 text-sm text-slate-500">Start planning trips with AI in minutes.</p>
+    <AuthLayout
+      image="/images/auth-resort.jpg"
+      quote="“Adventure is worthwhile in itself.”"
+      attribution="— Amelia Earhart"
+    >
+      <form onSubmit={handleSubmit} className="panel p-7 sm:p-10">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <BrandMark size={26} />
+        </span>
+        <h1 className="mt-6 font-display text-3xl font-normal tracking-tight text-text">
+          Create your account
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Start planning trips with AI in minutes.
+        </p>
 
         {error && (
           <div
             role="alert"
-            className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            className="mt-6 rounded-xl border border-error/25 bg-error/10 px-4 py-3 text-sm text-error"
           >
             {error}
           </div>
         )}
 
-        <label className="mt-6 block text-sm font-medium text-slate-700" htmlFor="name">
+        <label
+          className="mt-7 block text-[13px] font-medium tracking-[0.02em] text-muted"
+          htmlFor="name"
+        >
           Full name
         </label>
         <input
@@ -67,7 +80,10 @@ export default function Register() {
           autoComplete="name"
         />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="email">
+        <label
+          className="mt-6 block text-[13px] font-medium tracking-[0.02em] text-muted"
+          htmlFor="email"
+        >
           Email
         </label>
         <input
@@ -81,7 +97,10 @@ export default function Register() {
           autoComplete="email"
         />
 
-        <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="password">
+        <label
+          className="mt-6 block text-[13px] font-medium tracking-[0.02em] text-muted"
+          htmlFor="password"
+        >
           Password
         </label>
         <input
@@ -96,21 +115,20 @@ export default function Register() {
           autoComplete="new-password"
         />
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" size="lg" loading={submitting} className="mt-8 w-full">
           {submitting ? 'Creating account…' : 'Create account'}
-        </button>
+        </Button>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-muted">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
+          <Link
+            to="/login"
+            className="font-medium text-accent transition-colors duration-200 hover:text-accent/80"
+          >
             Sign in
           </Link>
         </p>
       </form>
-    </main>
+    </AuthLayout>
   )
 }

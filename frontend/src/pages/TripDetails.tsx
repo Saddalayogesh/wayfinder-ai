@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import MapView, { type MapItem } from '../components/MapView'
 import TripForm from '../components/TripForm'
+import DatePicker from '../components/common/DatePicker'
 import ErrorState from '../components/common/ErrorState'
 import Modal from '../components/common/Modal'
 import Skeleton from '../components/common/Skeleton'
+import TripCover from '../components/common/TripCover'
+import Badge from '../components/common/Badge'
 import { getErrorMessage } from '../services/api'
 import {
   addDay,
@@ -23,8 +26,31 @@ import {
   type Trip,
   type TripInput,
 } from '../services/tripService'
+import {
+  ArrowLeft,
+  CalendarPlus,
+  Clock,
+  Download,
+  MapPin,
+  Pencil,
+  Plus,
+  Share2,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'notfound'
+
+/** Ghost icon + label toolbar button (share / PDF / edit / delete). */
+const toolbarClass =
+  'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium text-muted transition-colors duration-200 hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50'
+
+/** Compact ghost button for the photo banner — blurred backdrop so it reads over the image. */
+const bannerToolbarClass =
+  'inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background/60 px-3 py-1.5 text-xs font-medium text-text backdrop-blur transition-colors duration-200 hover:border-text/30 hover:bg-background/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50'
+
+const inputClass = 'input'
 
 export default function TripDetails() {
   const { id } = useParams<{ id: string }>()
@@ -290,30 +316,33 @@ export default function TripDetails() {
 
   if (state === 'loading') {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
+      <main className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
         <Skeleton className="h-4 w-28" />
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="w-full sm:w-2/3">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="mt-3 h-4 w-1/2" />
+        <div className="mt-6 overflow-hidden rounded-2xl border border-border/70 bg-surface">
+          <Skeleton className="h-52 rounded-none sm:h-64" />
+          <div className="p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="w-full sm:w-2/3">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="mt-3 h-4 w-1/2" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-20 rounded-lg" />
+                <Skeleton className="h-9 w-20 rounded-lg" />
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-16 rounded-lg" />
-              <Skeleton className="h-9 w-16 rounded-lg" />
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
             </div>
-          </div>
-          <div className="mt-8 grid grid-cols-3 gap-3">
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-          </div>
-          <Skeleton className="mt-3 h-2 rounded-full" />
-          <Skeleton className="mt-8 h-72 rounded-xl" />
-          <div className="mt-8 space-y-4">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-40 rounded-xl" />
-            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="mt-3 h-1.5 rounded-full" />
+            <Skeleton className="mt-8 h-80 rounded-xl" />
+            <div className="mt-8 space-y-4">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-40 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
+            </div>
           </div>
         </div>
       </main>
@@ -322,11 +351,15 @@ export default function TripDetails() {
 
   if (state === 'notfound' || state === 'error' || !trip) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
-        <Link to="/trips" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-          ← My trips
+      <main className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
+        <Link
+          to="/trips"
+          className="inline-flex items-center gap-2 text-sm font-medium text-accent transition-colors duration-200 hover:text-accent/80"
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          My trips
         </Link>
-        <div className="mt-6">
+        <div className="mt-8">
           <ErrorState
             message={error ?? 'The trip does not exist or you do not have access to it.'}
             status={loadStatus}
@@ -337,420 +370,474 @@ export default function TripDetails() {
     )
   }
 
-  const inputClass =
-    'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200'
-
   // Budget summary numbers (recomputed on every render, so they stay live
   // after regenerations and edits).
   const estimated = trip.cost?.estimatedTotal ?? 0
   const remaining = trip.cost?.remaining ?? null
   const pct = trip.budget > 0 ? Math.min(100, (estimated / trip.budget) * 100) : 0
   const over = trip.budget > 0 && estimated > trip.budget
+  const overBy = remaining != null && remaining < 0
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
-      <Link to="/trips" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-        ← My trips
+    <main className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
+      <Link
+        to="/trips"
+        className="inline-flex items-center gap-2 text-sm font-medium text-accent transition-colors duration-200 hover:text-accent/80"
+      >
+        <ArrowLeft size={16} aria-hidden="true" />
+        My trips
       </Link>
 
       {error && (
         <div
           role="alert"
-          className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="mt-6 rounded-xl border border-error/25 bg-error/10 px-4 py-3 text-sm text-error"
         >
           {error}
         </div>
       )}
 
       {editing ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-900">Edit trip</h2>
-          <div className="mt-4">
-            <TripForm
-              initial={trip}
-              submitLabel="Save changes"
-              onSubmit={handleEditSubmit}
-            />
+        <div className="panel mt-6 p-7 sm:p-10">
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-text">Edit trip</h2>
+          <div className="mt-6">
+            <TripForm initial={trip} submitLabel="Save changes" onSubmit={handleEditSubmit} />
           </div>
           <button
             onClick={() => setEditing(false)}
-            className="mt-3 text-sm font-medium text-slate-500 hover:text-slate-700"
+            className="mt-4 text-sm font-medium text-muted transition-colors duration-200 hover:text-text"
           >
             Cancel
           </button>
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                  {trip.title}
-                </h1>
-                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                  {trip.travelStyle.replace(/_/g, ' ')}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-slate-500">
-                {formatDate(trip.startDate)} – {formatDate(trip.endDate)} · {trip.travelers}{' '}
-                {trip.travelers === 1 ? 'traveler' : 'travelers'} · {formatCurrency(trip.budget)}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+        <div className="panel mt-6 overflow-hidden">
+          {/* Destination cover banner */}
+          <div className="relative h-52 sm:h-64">
+            <TripCover
+              label={trip.destination}
+              sizes="(min-width: 1024px) 64rem, 100vw"
+              className="h-full"
+              scrim={false}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/60 to-background/15" />
+            {/* Share / PDF — ghost buttons over the banner's top-right. */}
+            <div className="absolute right-4 top-4 flex flex-wrap items-center gap-2 sm:right-6 sm:top-6">
               <button
                 onClick={handleShare}
                 disabled={busy || shareBusy}
-                className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                className={bannerToolbarClass}
               >
-                {shareBusy ? '…' : '🔗 Share'}
+                <Share2 size={15} aria-hidden="true" />
+                {shareBusy ? 'Preparing…' : 'Share'}
               </button>
               <button
                 onClick={handleDownloadPdf}
                 disabled={busy || downloadBusy}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                className={bannerToolbarClass}
               >
-                {downloadBusy ? '…' : '⬇ PDF'}
+                <Download size={15} aria-hidden="true" />
+                {downloadBusy ? 'Preparing…' : 'PDF'}
               </button>
-              <button
-                onClick={() => setEditing(true)}
-                disabled={busy}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={busy}
-                className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="font-display text-3xl font-normal tracking-tight text-text sm:text-4xl">
+                  {trip.title}
+                </h1>
+                <Badge color="primary" className="border-border bg-background/80 backdrop-blur-md">
+                  {trip.travelStyle.replace(/_/g, ' ')}
+                </Badge>
+              </div>
+              <p className="mt-2.5 text-sm text-muted">
+                {formatDate(trip.startDate)} – {formatDate(trip.endDate)} · {trip.travelers}{' '}
+                {trip.travelers === 1 ? 'traveler' : 'travelers'} · {formatCurrency(trip.budget, trip.currency)}
+              </p>
             </div>
           </div>
 
-          {trip.interests.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {trip.interests.map((interest) => (
-                <span
-                  key={interest}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
-                >
-                  {interest}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Budget summary — updates live after any regeneration */}
-          <section className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Budget</h2>
-              <span
-                className={`text-xs font-semibold ${
-                  over
-                    ? 'text-rose-600'
-                    : pct >= 80
-                      ? 'text-amber-600'
-                      : 'text-emerald-600'
-                }`}
-              >
-                {over ? 'Over budget' : pct >= 80 ? 'Close to budget' : 'On track'}
-              </span>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                  Budget
-                </div>
-                <div className="mt-1 text-lg font-bold text-slate-900">
-                  {formatCurrency(trip.budget)}
-                </div>
-              </div>
-              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                  Estimated
-                </div>
-                <div className={`mt-1 text-lg font-bold ${over ? 'text-rose-600' : 'text-slate-900'}`}>
-                  {formatCurrency(estimated)}
-                </div>
-              </div>
-              <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                  Remaining
-                </div>
-                <div
-                  className={`mt-1 text-lg font-bold ${
-                    remaining != null && remaining < 0 ? 'text-rose-600' : 'text-emerald-600'
-                  }`}
-                >
-                  {remaining != null ? formatCurrency(remaining) : '—'}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  over ? 'bg-rose-500' : 'bg-emerald-500'
-                }`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            {trip.cost && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {Object.entries(trip.cost.breakdown)
-                  .filter(([, value]) => value > 0)
-                  .map(([category, value]) => (
-                    <span
-                      key={category}
-                      className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium capitalize text-slate-600 ring-1 ring-slate-200"
-                    >
-                      {category} · {formatCurrency(value)}
-                    </span>
-                  ))}
-              </div>
-            )}
-          </section>
-
-          {/* Interactive map */}
-          {mapItems.some((i) => i.latitude != null && i.longitude != null) && (
-            <section className="mt-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">Map</h2>
-                {mappedItemCount < mapItems.length && (
-                  <span className="text-xs text-slate-400">
-                    {mapItems.length - mappedItemCount} place{mapItems.length - mappedItemCount === 1 ? '' : 's'} without coordinates
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-xs text-slate-400">
-                Click a pin or a place below to find it on the other side.
-              </p>
-              <MapView
-                className="mt-3"
-                items={mapItems}
-                highlightedId={highlightedItemId}
-                onSelectItem={handleMarkerSelect}
-              />
-            </section>
-          )}
-
-          {/* Itinerary */}
-          <section className="mt-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Itinerary</h2>
-              <button
-                onClick={() => setShowAddDay((v) => !v)}
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-              >
-                + Add day
+          <div className="p-6 sm:p-8">
+            {/* Toolbar: edit / delete — share & PDF live on the banner. */}
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border/60 pb-6">
+              <button onClick={() => setEditing(true)} disabled={busy} className={toolbarClass}>
+                <Pencil size={18} aria-hidden="true" />
+                Edit
+              </button>
+              <button onClick={handleDelete} disabled={busy} className={toolbarClass}>
+                <Trash2 size={18} aria-hidden="true" />
+                Delete
               </button>
             </div>
 
-            {showAddDay && (
-              <form
-                onSubmit={handleAddDay}
-                className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div>
-                  <label htmlFor="newDayDate" className="block text-sm font-medium text-slate-700">
-                    Date
-                  </label>
-                  <input
-                    id="newDayDate"
-                    type="date"
-                    required
-                    value={newDayDate}
-                    onChange={(e) => setNewDayDate(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {busy ? 'Adding…' : 'Add day'}
-                </button>
-              </form>
-            )}
-
-            {trip.days.length === 0 ? (
-              <div className="mt-4 rounded-xl border-2 border-dashed border-slate-300 p-8 text-center">
-                <div className="text-3xl" aria-hidden="true">
-                  🏝️
-                </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  No itinerary yet. Add a day to start sketching your trip, or wait for AI
-                  planning to do it for you.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-6 space-y-6">
-                {trip.days.map((day) => (
-                  <div key={day.id} className="rounded-xl border border-slate-200">
-                    <div className="flex items-center justify-between rounded-t-xl border-b border-slate-200 bg-slate-50 px-4 py-3">
-                      <h3 className="text-sm font-bold text-slate-900">
-                        Day {day.dayNumber}
-                        <span className="ml-2 font-medium text-slate-500">
-                          {formatDate(day.date)}
-                        </span>
-                      </h3>
-                      <div className="flex items-center gap-3">
-                        {regeneratingDay === day.dayNumber ? (
-                          <span className="flex items-center gap-1.5 text-sm font-medium text-indigo-600">
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-                            Re-planning…
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setRegenerateInstruction('')
-                              setRegenerateDayNumber(day.dayNumber)
-                            }}
-                            disabled={busy || regeneratingDay != null}
-                            className="text-sm font-medium text-indigo-600 transition hover:text-indigo-800 disabled:opacity-50"
-                          >
-                            ✨ Regenerate
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            if (itemFormFor === day.id) {
-                              setItemFormFor(null)
-                            } else {
-                              setPlaceName('')
-                              setDescription('')
-                              setEstimatedCost('')
-                              setVisitDuration('')
-                              setItemFormFor(day.id)
-                            }
-                          }}
-                          disabled={busy || regeneratingDay != null}
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
-                        >
-                          {itemFormFor === day.id ? 'Cancel' : '+ Add place'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDay(day.id)}
-                          disabled={busy || regeneratingDay === day.dayNumber}
-                          className="text-sm font-medium text-rose-500 hover:text-rose-600 disabled:opacity-50"
-                        >
-                          Delete day
-                        </button>
-                      </div>
-                    </div>
-
-                    {itemFormFor === day.id && (
-                      <form
-                        onSubmit={(e) => handleAddItem(e, day.id)}
-                        className="grid gap-3 border-b border-slate-200 bg-indigo-50/50 p-4 sm:grid-cols-2"
-                      >
-                        <div className="sm:col-span-2">
-                          <input
-                            type="text"
-                            required
-                            value={placeName}
-                            onChange={(e) => setPlaceName(e.target.value)}
-                            placeholder="Place name (e.g. Senso-ji Temple)"
-                            className={inputClass}
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Short description (optional)"
-                          className={inputClass}
-                        />
-                        <div className="grid grid-cols-2 gap-3">
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={estimatedCost}
-                            onChange={(e) => setEstimatedCost(e.target.value)}
-                            placeholder="Cost (USD)"
-                            className={inputClass}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            value={visitDuration}
-                            onChange={(e) => setVisitDuration(e.target.value)}
-                            placeholder="Minutes"
-                            className={inputClass}
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={busy}
-                          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 sm:col-span-2"
-                        >
-                          {busy ? 'Adding…' : 'Add place'}
-                        </button>
-                      </form>
-                    )}
-
-                    {day.items.length === 0 ? (
-                      <p className="px-4 py-4 text-sm text-slate-400">No places planned for this day.</p>
-                    ) : (
-                      <ol className="divide-y divide-slate-100">
-                        {day.items.map((item) => (
-                          <li
-                            key={item.id}
-                            id={`trip-item-${item.id}`}
-                            onMouseEnter={() => handleItemHover(item.id)}
-                            onMouseLeave={() => handleItemHover(null)}
-                            onClick={() => handleMarkerSelect(item.id)}
-                            className={`flex cursor-pointer items-start justify-between gap-3 px-4 py-3 transition-colors ${
-                              selectedItemId === item.id
-                                ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300'
-                                : highlightedItemId === item.id
-                                  ? 'bg-indigo-50/60'
-                                  : 'hover:bg-slate-50'
-                            }`}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">
-                                  {item.sequenceOrder}
-                                </span>
-                                <span className="text-sm font-semibold text-slate-900">
-                                  {item.placeName}
-                                </span>
-                              </div>
-                              {item.description && (
-                                <p className="mt-1 text-sm text-slate-500">{item.description}</p>
-                              )}
-                              <p className="mt-1 text-xs text-slate-400">
-                                {item.latitude == null || item.longitude == null ? (
-                                  <span className="text-slate-300">no map pin</span>
-                                ) : (
-                                  '📍'
-                                )}
-                                {item.estimatedCost != null && `  ${formatCurrency(item.estimatedCost)}`}
-                                {item.estimatedCost != null && item.visitDuration != null && ' · '}
-                                {item.visitDuration != null &&
-                                  `${item.visitDuration >= 60 ? `${Math.floor(item.visitDuration / 60)}h${item.visitDuration % 60 ? ` ${item.visitDuration % 60}m` : ''}` : `${item.visitDuration}m`}`}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteItem(day.id, item.id)}
-                              disabled={busy}
-                              className="shrink-0 text-sm font-medium text-rose-400 hover:text-rose-600 disabled:opacity-50"
-                              aria-label={`Delete ${item.placeName}`}
-                            >
-                              ✕
-                            </button>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </div>
+            {trip.interests.length > 0 && (
+              <div className="mt-6 flex flex-wrap gap-1.5">
+                {trip.interests.map((interest) => (
+                  <Badge key={interest} color="slate">
+                    {interest}
+                  </Badge>
                 ))}
               </div>
             )}
-          </section>
+
+            {/* Budget summary — updates live after any regeneration */}
+            <section className="mt-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-2xl font-semibold tracking-tight text-text">
+                  Budget
+                </h2>
+                <span
+                  className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+                    over
+                      ? 'text-amber-600 dark:text-amber-300'
+                      : pct >= 80
+                        ? 'text-amber-600 dark:text-amber-300'
+                        : 'text-success'
+                  }`}
+                >
+                  {over ? 'Over budget' : pct >= 80 ? 'Close to budget' : 'On track'}
+                </span>
+              </div>
+
+              {/* Metric cards — muted 13px label, 24px/500 number. */}
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-border/60 bg-background/40 p-5">
+                  <div className="text-[13px] font-medium uppercase tracking-[0.18em] text-muted">
+                    Budget
+                  </div>
+                  <div className="mt-2 font-display text-[28px] font-normal leading-tight tracking-tight text-text">
+                    {formatCurrency(trip.budget, trip.currency)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/40 p-5">
+                  <div className="text-[13px] font-medium uppercase tracking-[0.18em] text-muted">
+                    Estimated
+                  </div>
+                  <div
+                    className={`mt-2 font-display text-[28px] font-normal leading-tight tracking-tight ${
+                      over ? 'text-amber-600 dark:text-amber-300' : 'text-text'
+                    }`}                    >
+                    {formatCurrency(estimated, trip.currency)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/40 p-5">
+                  <div className="text-[13px] font-medium uppercase tracking-[0.18em] text-muted">
+                    Remaining
+                  </div>
+                  <div
+                    className={`mt-2 font-display text-[28px] font-normal leading-tight tracking-tight ${
+                      overBy ? 'text-amber-600 dark:text-amber-300' : 'text-success'
+                    }`}
+                  >
+                    {remaining != null ? formatCurrency(remaining, trip.currency) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-border">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    over
+                      ? 'bg-gradient-to-r from-error to-error/80'
+                      : 'bg-gradient-to-r from-primary to-accent'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              {trip.cost && (
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {Object.entries(trip.cost.breakdown)
+                    .filter(([, value]) => value > 0)
+                    .map(([category, value]) => (
+                      <Badge key={category} color="slate" className="capitalize">
+                        {category} · {formatCurrency(value, trip.currency)}
+                      </Badge>
+                    ))}
+                </div>
+              )}
+            </section>
+
+            {/* Interactive map */}
+            {mapItems.some((i) => i.latitude != null && i.longitude != null) && (
+              <section className="mt-10">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-display text-2xl font-semibold tracking-tight text-text">
+                    Map
+                  </h2>
+                  {mappedItemCount < mapItems.length && (
+                    <span className="text-xs text-muted">
+                      {mapItems.length - mappedItemCount} place
+                      {mapItems.length - mappedItemCount === 1 ? '' : 's'} without coordinates
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Click a pin or a place below to find it on the other side.
+                </p>
+                <MapView
+                  className="mt-4"
+                  items={mapItems}
+                  highlightedId={highlightedItemId}
+                  onSelectItem={handleMarkerSelect}
+                  currency={trip.currency}
+                />
+              </section>
+            )}
+
+            {/* Itinerary */}
+            <section className="mt-10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display text-2xl font-semibold tracking-tight text-text">
+                    Itinerary
+                  </h2>
+                  <p className="mt-1 text-xs text-muted">
+                    {trip.days.length} day{trip.days.length === 1 ? '' : 's'} planned
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddDay((v) => !v)}
+                  className="inline-flex items-center gap-2 rounded-xl btn-primary-bg px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                >
+                  <CalendarPlus size={16} aria-hidden="true" />
+                  Add day
+                </button>
+              </div>
+
+              {showAddDay && (
+                <form
+                  onSubmit={handleAddDay}
+                  className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-border/60 bg-background/40 p-5"
+                >
+                  <div className="w-56">
+                    <DatePicker
+                      id="newDayDate"
+                      label="Date"
+                      value={newDayDate}
+                      onChange={setNewDayDate}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={busy || !newDayDate}
+                    className="rounded-xl btn-primary-bg px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    {busy ? 'Adding…' : 'Add day'}
+                  </button>
+                </form>
+              )}
+
+              {trip.days.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-border/70 bg-background/30 px-8 py-12 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <CalendarPlus size={22} aria-hidden="true" />
+                  </div>
+                  <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-muted">
+                    No itinerary yet. Add a day to start sketching your trip, or wait for AI
+                    planning to do it for you.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-6">
+                  {trip.days.map((day) => (
+                    <div
+                      key={day.id}
+                      className="overflow-hidden rounded-2xl border border-border/60 bg-background/20"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-surface px-5 py-4">
+                        <h3 className="font-display text-xl font-normal tracking-tight text-text">
+                          Day {day.dayNumber}
+                          <span className="ml-2 font-sans text-sm font-medium tracking-normal text-muted">
+                            {formatDate(day.date)}
+                          </span>
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-4">
+                          {regeneratingDay === day.dayNumber ? (
+                            <span className="flex items-center gap-2 text-sm font-medium text-primary">
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                              Re-planning…
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setRegenerateInstruction('')
+                                setRegenerateDayNumber(day.dayNumber)
+                              }}
+                              disabled={busy || regeneratingDay != null}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors duration-200 hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50"
+                            >
+                              <Sparkles size={15} aria-hidden="true" />
+                              Regenerate
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (itemFormFor === day.id) {
+                                setItemFormFor(null)
+                              } else {
+                                setPlaceName('')
+                                setDescription('')
+                                setEstimatedCost('')
+                                setVisitDuration('')
+                                setItemFormFor(day.id)
+                              }
+                            }}
+                            disabled={busy || regeneratingDay != null}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors duration-200 hover:text-primary/80 disabled:opacity-50"
+                          >
+                            {itemFormFor === day.id ? (
+                              <>
+                                <X size={15} aria-hidden="true" />
+                                Cancel
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={15} aria-hidden="true" />
+                                Add place
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDay(day.id)}
+                            disabled={busy || regeneratingDay === day.dayNumber}
+                            className="text-sm font-medium text-error transition-colors duration-200 hover:text-error/80 disabled:opacity-50"
+                          >
+                            Delete day
+                          </button>
+                        </div>
+                      </div>
+
+                      {itemFormFor === day.id && (
+                        <form
+                          onSubmit={(e) => handleAddItem(e, day.id)}
+                          className="grid gap-3 border-b border-border/60 bg-primary/5 p-5 sm:grid-cols-2"
+                        >
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              required
+                              value={placeName}
+                              onChange={(e) => setPlaceName(e.target.value)}
+                              placeholder="Place name (e.g. Senso-ji Temple)"
+                              className={inputClass}
+                            />
+                          </div>
+                          <input
+                            type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Short description (optional)"
+                            className={inputClass}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={estimatedCost}
+                              onChange={(e) => setEstimatedCost(e.target.value)}
+                              placeholder={`Cost (${trip.currency})`}
+                              className={inputClass}
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              value={visitDuration}
+                              onChange={(e) => setVisitDuration(e.target.value)}
+                              placeholder="Minutes"
+                              className={inputClass}
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={busy}
+                            className="rounded-xl btn-primary-bg px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:col-span-2"
+                          >
+                            {busy ? 'Adding…' : 'Add place'}
+                          </button>
+                        </form>
+                      )}
+
+                      {day.items.length === 0 ? (
+                        <p className="px-5 py-5 text-sm text-muted">No places planned for this day.</p>
+                      ) : (
+                        <ol className="divide-y divide-border/60">
+                          {day.items.map((item) => (
+                            <li
+                              key={item.id}
+                              id={`trip-item-${item.id}`}
+                              onMouseEnter={() => handleItemHover(item.id)}
+                              onMouseLeave={() => handleItemHover(null)}
+                              onClick={() => handleMarkerSelect(item.id)}
+                              className={`flex cursor-pointer items-start gap-4 px-5 py-4 transition-colors duration-200 ${
+                                selectedItemId === item.id
+                                  ? 'bg-primary/10 ring-1 ring-inset ring-primary/30'
+                                  : highlightedItemId === item.id
+                                    ? 'bg-primary/5'
+                                    : 'hover:bg-surface-hover/60'
+                              }`}
+                            >
+                              {/* Place thumbnail — Places photo when available,
+                                  else the Unsplash fallback pattern. */}
+                              <TripCover
+                                label={item.placeName}
+                                src={item.photoUrl}
+                                scrim={false}
+                                className="mt-0.5 h-12 w-12 shrink-0 rounded-xl"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
+                                    {item.sequenceOrder}
+                                  </span>
+                                  <span className="text-sm font-semibold text-text">
+                                    {item.placeName}
+                                  </span>
+                                </div>
+                                {item.description && (
+                                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                                    {item.description}
+                                  </p>
+                                )}
+                                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPin size={12} aria-hidden="true" />
+                                    {item.latitude == null || item.longitude == null
+                                      ? 'no map pin'
+                                      : 'on map'}
+                                  </span>
+                                  {item.estimatedCost != null && (
+                                    <span>{formatCurrency(item.estimatedCost, trip.currency)}</span>
+                                  )}
+                                  {item.visitDuration != null && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock size={12} aria-hidden="true" />
+                                      {item.visitDuration >= 60
+                                        ? `${Math.floor(item.visitDuration / 60)}h${
+                                            item.visitDuration % 60 ? ` ${item.visitDuration % 60}m` : ''
+                                          }`
+                                        : `${item.visitDuration}m`}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteItem(day.id, item.id)}
+                                disabled={busy}
+                                className="shrink-0 rounded-lg p-1.5 text-muted transition-colors duration-200 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 disabled:opacity-50"
+                                aria-label={`Delete ${item.placeName}`}
+                              >
+                                <X size={16} aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
       )}
 
@@ -763,81 +850,72 @@ export default function TripDetails() {
           <button
             type="button"
             onClick={handleCopyShareLink}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            className="rounded-xl btn-primary-bg px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             {shareCopied ? 'Copied ✓' : 'Copy link'}
           </button>
         }
       >
-        <p className="text-sm text-slate-500">
-          Anyone with this link can view the trip read-only — no sign-in needed. You can
-          revoke it by… well, you can’t yet. Share wisely. 😄
+        <p className="text-sm leading-relaxed text-muted">
+          Anyone with this link can view the trip read-only — no sign-in needed.
         </p>
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-background/60 p-2.5">
           <input
             id="share-url-input"
             readOnly
             value={shareUrl}
             onFocus={(e) => e.currentTarget.select()}
-            className="w-full bg-transparent text-sm text-slate-700 focus:outline-none"
+            className="w-full bg-transparent text-sm text-text focus:outline-none"
           />
         </div>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-muted">
           Opens at /shared/trips/&lt;token&gt; — the same page works for signed-in and signed-out
           visitors.
         </p>
       </Modal>
 
       {/* Regenerate-day modal */}
-      {regenerateDayNumber != null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-          onClick={() => setRegenerateDayNumber(null)}
-        >
-          <form
-            onSubmit={handleRegenerate}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="regenerate-modal-title"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-          >
-            <h2 id="regenerate-modal-title" className="text-lg font-bold text-slate-900">
-              Regenerate Day {regenerateDayNumber}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Tell Gemini how to re-plan this day — the rest of your itinerary
-              stays exactly as it is.
-            </p>
-            <textarea
-              value={regenerateInstruction}
-              onChange={(e) => setRegenerateInstruction(e.target.value)}
-              placeholder="e.g. Focus on food, skip crowded tourist spots, start late in the morning"
-              rows={3}
-              maxLength={500}
-              autoFocus
-              className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRegenerateDayNumber(null)}
-                disabled={regeneratingDay != null}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!regenerateInstruction.trim() || regeneratingDay != null}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {regeneratingDay === regenerateDayNumber ? 'Regenerating…' : '✨ Regenerate day'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <Modal
+        open={regenerateDayNumber != null}
+        onClose={() => setRegenerateDayNumber(null)}
+        title={regenerateDayNumber != null ? `Regenerate Day ${regenerateDayNumber}` : ''}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setRegenerateDayNumber(null)}
+              disabled={regeneratingDay != null}
+              className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-text transition-colors duration-200 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="regenerate-form"
+              disabled={!regenerateInstruction.trim() || regeneratingDay != null}
+              className="inline-flex items-center gap-2 rounded-xl btn-primary-bg px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              {regeneratingDay === regenerateDayNumber ? 'Regenerating…' : 'Regenerate day'}
+            </button>
+          </>
+        }
+      >
+        <form id="regenerate-form" onSubmit={handleRegenerate}>
+          <p className="text-sm leading-relaxed text-muted">
+            Tell Gemini how to re-plan this day — the rest of your itinerary stays exactly as it is.
+          </p>
+          <textarea
+            value={regenerateInstruction}
+            onChange={(e) => setRegenerateInstruction(e.target.value)}
+            placeholder="e.g. Focus on food, skip crowded tourist spots, start late in the morning"
+            rows={3}
+            maxLength={500}
+            autoFocus
+            className="input mt-4 resize-none py-3"
+          />
+        </form>
+      </Modal>
     </main>
   )
 }

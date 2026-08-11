@@ -76,6 +76,7 @@ public class TripController {
                               "endDate": "2026-09-05",
                               "travelers": 2,
                               "budget": 2500.00,
+                              "currency": "USD",
                               "travelStyle": "CULTURAL",
                               "interests": ["Food", "History", "Photography"]
                             }
@@ -180,8 +181,9 @@ public class TripController {
         // Gemini request never runs inside a DB transaction.
         RegenerateContext context = tripService.getRegenerateContext(userId, tripId, dayNumber);
         List<GeneratedActivity> activities = geminiService.regenerateDay(
-                context.destination(), dayNumber, context.itinerarySummary(), context.budget(),
-                context.travelStyle(), List.copyOf(context.interests()), request.instruction());
+                context.destination(), context.currency(), dayNumber, context.itinerarySummary(),
+                context.budget(), context.travelStyle(), List.copyOf(context.interests()),
+                request.instruction());
         return tripService.replaceDayItems(userId, tripId, dayNumber, activities);
     }
 

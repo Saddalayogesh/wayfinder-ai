@@ -12,7 +12,7 @@
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6.svg)](#-tech-stack)
 
-**[Overview](#-overview) · [Features](#-features) · [Screenshots](#-screenshots) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [API Docs](#-api-documentation) · [Testing](#-testing) · [Deployment](#-deployment) · [Contributing](#-contributing) · [License](#-license)**
+**[Overview](#-overview) · [Features](#-features) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [API Docs](#-api-documentation) · [Testing](#-testing) · [Deployment](#-deployment) · [Contributing](#-contributing) · [License](#-license)**
 
 </div>
 
@@ -57,17 +57,6 @@ Tell Wayfinder AI where you want to go and what you love to do, and it designs a
 - **Brand identity** — custom Wayfinder AI compass mark across the navbar, footer, auth screens, and favicon.
 
 ---
-
-## 📸 Screenshots
-
-> **TODO** — replace with real captures before publishing. Suggested set:
-
-| View | What to capture |
-| --- | --- |
-| **Home** | Hero, destination-inspiration rail, "How it works" |
-| **Plan a trip** | Form + live destination preview + running summary |
-| **Trip details** | Cover banner, budget metrics, map, day-by-day itinerary |
-| **Auth** | Login split-screen with the photo panel |
 
 ---
 

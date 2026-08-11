@@ -1,0 +1,24 @@
+# VCS
+.git
+.gitignore
+
+# Node
+**/node_modules
+frontend/dist
+
+# Maven / Java
+**/target
+
+# Tests are compiled+run in CI, not inside the image build
+backend/src/test
+
+# Secrets & env
+.env
+.env.local
+*.log
+
+# IDE / OS
+.idea
+.vscode
+*.iml
+.DS_Store

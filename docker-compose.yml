@@ -1,0 +1,86 @@
+# The full Wayfinder AI stack — one command, zero manual steps beyond
+# copying .env.example to .env (and setting GEMINI_API_KEY).
+#
+#   docker compose up --build
+#   -> open http://localhost:8080
+#
+# Services:
+#   mysql  - the database (data persists in the mysql_data volume)
+#   redis  - cache for place enrichment data (CACHE_TYPE=redis)
+#   app    - the single monolith container: React SPA + Spring Boot API on :8080
+#
+# NOTE: this is intentionally ONE app container — there is no separate
+# frontend container. The React build is embedded inside the app JAR.
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: wayfinder-ai-mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-wayfinder_ai}
+      MYSQL_USER: ${MYSQL_USER:-tripapp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tripapp}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # TCP-based ping on purpose: `-h localhost` would use the unix socket,
+      # which the image's one-off init server already listens on while it is
+      # still setting up the data directory — the check would pass too early
+      # and the app could boot before MySQL is actually ready. 127.0.0.1 forces
+      # a TCP connection, which only succeeds once the real server is listening.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: wayfinder-ai-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: wayfinder-ai-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-wayfinder_ai}?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${MYSQL_USER:-tripapp}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-tripapp}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CACHE_TYPE: ${CACHE_TYPE:-redis}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-latest}
+      JWT_SECRET: ${JWT_SECRET:-TonncSZLaN4gggtvHuzDet44Uh6YSTF20h12GnSPcmIjow5hdkJDR7CCGE9k4Ta9}
+      PLACES_PROVIDER: ${PLACES_PROVIDER:-osm}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+    ports:
+      - "8080:8080"
+    # Mirrors the Dockerfile HEALTHCHECK — the app is healthy when the public
+    # /api/health probe answers 200 with {"status":"UP"}. The start_period
+    # absorbs the JVM + Spring Boot + Hibernate schema-update boot time.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

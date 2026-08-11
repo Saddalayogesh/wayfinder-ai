@@ -77,6 +77,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GHCR image names must be lowercase, but github.repository preserves
+      # the owner's case (e.g. "Saddalayogesh/wayfinder-ai"), which makes
+      # buildx reject the tag. Lowercase it in bash before tagging.
+      - name: Derive lowercase GHCR image name
+        id: ghcr-image
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push the Docker image to GHCR
         if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v6
@@ -84,5 +91,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ${{ steps.ghcr-image.outputs.image }}:latest
+            ${{ steps.ghcr-image.outputs.image }}:${{ github.sha }}

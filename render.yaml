@@ -18,7 +18,7 @@ services:
     runtime: docker
     repo: https://github.com/Saddalayogesh/wayfinder-ai
     # Deploys from the dev branch (the repo's active development branch).
-    branch: dev
+    branch: main
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health

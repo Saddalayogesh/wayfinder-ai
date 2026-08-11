@@ -10,6 +10,7 @@ import java.util.Set;
  */
 public record RegenerateContext(
         String destination,
+        String currency,
         BigDecimal budget,
         String travelStyle,
         Set<String> interests,

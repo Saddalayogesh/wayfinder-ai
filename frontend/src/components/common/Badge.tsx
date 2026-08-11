@@ -1,26 +1,26 @@
 import { cn } from '../../utils/cn'
 import type { HTMLAttributes } from 'react'
 
-type BadgeColor = 'indigo' | 'slate' | 'emerald' | 'amber' | 'rose' | 'violet'
+type BadgeColor = 'primary' | 'slate' | 'accent' | 'warning' | 'danger' | 'violet'
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   color?: BadgeColor
 }
 
 const colorClasses: Record<BadgeColor, string> = {
-  indigo: 'bg-indigo-100 text-indigo-700',
-  slate: 'bg-slate-100 text-slate-600',
-  emerald: 'bg-emerald-100 text-emerald-700',
-  amber: 'bg-amber-100 text-amber-700',
-  rose: 'bg-rose-100 text-rose-700',
-  violet: 'bg-violet-100 text-violet-700',
+  primary: 'bg-primary/15 text-primary border-primary/25',
+  slate: 'bg-surface-hover text-muted border-border/80',
+  accent: 'bg-accent/10 text-accent border-accent/25',
+  warning: 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-400/10 dark:text-amber-300 dark:border-amber-400/25',
+  danger: 'bg-error/10 text-error border-error/25',
+  violet: 'bg-primary/15 text-primary border-primary/25',
 }
 
-export default function Badge({ color = 'indigo', className, ...rest }: BadgeProps) {
+export default function Badge({ color = 'primary', className, ...rest }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
         colorClasses[color],
         className,
       )}

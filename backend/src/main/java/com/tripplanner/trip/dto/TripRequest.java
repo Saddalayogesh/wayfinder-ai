@@ -7,6 +7,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -63,8 +64,20 @@ public record TripRequest(
 
         @Valid
         @Schema(description = "Optional itinerary days; omit to keep existing days on update")
-        List<@NotNull(message = "Day entries must not be null") TripDayRequest> days
+        List<@NotNull(message = "Day entries must not be null") TripDayRequest> days,
+
+        @Schema(example = "USD", description = "Optional ISO-4217 currency code for costs and the budget; defaults to USD")
+        @Size(max = 10, message = "Currency must be at most 10 characters")
+        @Pattern(regexp = "^[A-Za-z]{3}$", message = "Currency must be a 3-letter ISO-4217 code")
+        String currency
 ) {
+    /** Convenience constructor for callers that don't set a currency (defaults to USD). */
+    public TripRequest(String title, String destination, LocalDate startDate, LocalDate endDate,
+                       Integer travelers, BigDecimal budget, String travelStyle,
+                       List<String> interests, List<TripDayRequest> days) {
+        this(title, destination, startDate, endDate, travelers, budget, travelStyle, interests, days, null);
+    }
+
     @AssertTrue(message = "endDate must be on or after startDate")
     public boolean isDateRangeValid() {
         return startDate == null || endDate == null || !startDate.isAfter(endDate);

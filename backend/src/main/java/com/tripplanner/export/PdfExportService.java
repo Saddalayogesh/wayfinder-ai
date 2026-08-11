@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.format.DateTimeFormatter;
+import java.util.Currency;
 import java.util.Locale;
 
 /**
@@ -32,7 +33,6 @@ public class PdfExportService {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
-    private static final NumberFormat MONEY = NumberFormat.getCurrencyInstance(Locale.US);
 
     private static final Font H1 = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, new Color(0x0f, 0x17, 0x2a));
     private static final Font SUB = FontFactory.getFont(FontFactory.HELVETICA, 10, new Color(0x64, 0x74, 0x8b));
@@ -48,7 +48,7 @@ public class PdfExportService {
             PdfWriter.getInstance(document, out);
             document.open();
             writeHeader(document, trip);
-            writeBudget(document, trip.cost());
+            writeBudget(document, trip.cost(), trip.currency());
             writeItinerary(document, trip);
             document.close();
         } catch (DocumentException e) {
@@ -71,7 +71,7 @@ public class PdfExportService {
                 trip.startDate().format(DATE_FMT),
                 trip.endDate().format(DATE_FMT),
                 travelers,
-                money(trip.budget())), SUB);
+                money(trip.budget(), trip.currency())), SUB);
         document.add(sub);
 
         Paragraph rule = new Paragraph();
@@ -80,21 +80,21 @@ public class PdfExportService {
         document.add(rule);
     }
 
-    private void writeBudget(Document document, CostBreakdown cost) throws DocumentException {
+    private void writeBudget(Document document, CostBreakdown cost, String currency) throws DocumentException {
         document.add(new Paragraph("Budget summary", H2));
         if (cost == null) {
             document.add(new Paragraph("No cost data available.", MUTED));
             document.add(space());
             return;
         }
-        document.add(line("Estimated total", money(cost.estimatedTotal())));
-        document.add(line("Remaining", cost.remaining() == null ? "—" : money(cost.remaining())));
+        document.add(line("Estimated total", money(cost.estimatedTotal(), currency)));
+        document.add(line("Remaining", cost.remaining() == null ? "—" : money(cost.remaining(), currency)));
         java.util.Map<String, BigDecimal> byCategory = cost.breakdown();
         if (byCategory != null) {
             for (String category : new String[]{"accommodation", "food", "activities", "transport"}) {
                 BigDecimal value = byCategory.get(category);
                 if (value != null && value.signum() > 0) {
-                    document.add(line("  " + category, money(value)));
+                    document.add(line("  " + category, money(value, currency)));
                 }
             }
         }
@@ -125,7 +125,7 @@ public class PdfExportService {
                 if (item.estimatedCost() != null || item.visitDuration() != null) {
                     name.append("  —");
                     if (item.estimatedCost() != null) {
-                        name.append("  ").append(money(item.estimatedCost()));
+                        name.append("  ").append(money(item.estimatedCost(), trip.currency()));
                     }
                     if (item.visitDuration() != null) {
                         name.append("  ·  ").append(duration(item.visitDuration()));
@@ -160,11 +160,20 @@ public class PdfExportService {
         return p;
     }
 
-    private static String money(BigDecimal value) {
+    /** Formats money in the trip's currency; unknown codes fall back to USD. */
+    private static String money(BigDecimal value, String currency) {
         if (value == null) {
             return "—";
         }
-        return MONEY.format(value);
+        NumberFormat format = NumberFormat.getCurrencyInstance(Locale.US);
+        try {
+            if (currency != null && !currency.isBlank()) {
+                format.setCurrency(Currency.getInstance(currency.trim().toUpperCase()));
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Unrecognized code — keep the USD formatter.
+        }
+        return format.format(value);
     }
 
     /** "90" -> "1h 30m", "45" -> "45m". */

@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import { getErrorMessage, getMe, updateMe } from '../services/api'
 import Badge from '../components/common/Badge'
 import Button from '../components/common/Button'
-import Card from '../components/common/Card'
 import Input from '../components/common/Input'
 import ErrorState from '../components/common/ErrorState'
 import Skeleton from '../components/common/Skeleton'
+import { KeyRound, Pencil, UserRound } from 'lucide-react'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -85,11 +85,16 @@ export default function Profile() {
 
   if (state === 'loading') {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-14 sm:px-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="mt-6 space-y-6">
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
+      <main className="mx-auto max-w-lg px-4 py-20 sm:px-6">
+        <Skeleton className="h-10 w-40" />
+        <div className="panel mt-8 p-8">
+          <div className="flex flex-col items-center">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <Skeleton className="mt-4 h-5 w-40" />
+          </div>
+          <Skeleton className="mt-8 h-20 rounded-xl" />
+          <Skeleton className="mt-6 h-20 rounded-xl" />
+          <Skeleton className="mt-6 h-20 rounded-xl" />
         </div>
       </main>
     )
@@ -97,40 +102,64 @@ export default function Profile() {
 
   if (state === 'error') {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-14 sm:px-6">
+      <main className="mx-auto max-w-lg px-4 py-20 sm:px-6">
         <ErrorState message={loadError ?? ''} onRetry={() => window.location.reload()} />
       </main>
     )
   }
 
+  const initials = (user?.name ?? '?').charAt(0).toUpperCase()
+
   return (
-    <main className="mx-auto max-w-2xl px-4 py-14 sm:px-6">
-      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Profile</h1>
-      <p className="mt-1 text-sm text-slate-500">
+    <main className="mx-auto max-w-lg px-4 py-20 sm:px-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">Account</p>
+      <h1 className="mt-3 font-display text-4xl font-normal tracking-tight text-text">
+        Profile
+      </h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted">
         Manage your account details and password.
       </p>
 
-      <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-lg font-bold text-white">
-          {(user?.name ?? '?').charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-slate-900">{user?.name}</p>
-          <p className="truncate text-sm text-slate-500">{user?.email}</p>
+      <div className="panel mt-8 p-8 sm:p-10">
+        {/* Avatar — large, with a hover edit overlay that jumps to the name field. */}
+        <div className="flex flex-col items-center text-center">
+          <div className="group relative">
+            <span className="btn-primary-bg flex h-20 w-20 items-center justify-center rounded-full font-display text-3xl font-semibold text-white shadow-glow ring-2 ring-primary/30">
+              {initials}
+            </span>
+            <button
+              type="button"
+              onClick={() => document.getElementById('profile-name')?.focus()}
+              aria-label="Edit display name"
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-background/60 text-text opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 dark:text-white"
+            >
+              <Pencil size={18} aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mt-4 font-semibold text-text">{user?.name}</p>
+          <p className="mt-0.5 text-sm text-muted">{user?.email}</p>
+          <Badge color={user?.role === 'ADMIN' ? 'violet' : 'primary'} className="mt-3">
+            {user?.role ?? 'USER'}
+          </Badge>
         </div>
-        <Badge color={user?.role === 'ADMIN' ? 'violet' : 'indigo'} className="ml-auto shrink-0">
-          {user?.role ?? 'USER'}
-        </Badge>
-      </div>
 
-      {/* Name */}
-      <Card className="mt-6 p-6">
-        <h2 className="text-lg font-bold text-slate-900">Display name</h2>
-        <p className="mt-1 text-sm text-slate-500">How your name appears across the app.</p>
-        <form onSubmit={handleNameSubmit} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
+        {/* ---- Account ---- */}
+        <section className="mt-9">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <UserRound size={19} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-normal tracking-tight text-text">
+                Account
+              </h2>
+              <p className="mt-0.5 text-sm text-muted">How your name appears across the app.</p>
+            </div>
+          </div>
+          <form onSubmit={handleNameSubmit} className="mt-6">
             <Input
-              label="Name"
+              id="profile-name"
+              label="Display name"
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
@@ -140,74 +169,87 @@ export default function Profile() {
               maxLength={100}
               required
             />
-          </div>
-          <Button type="submit" loading={nameSaving}>
-            Save name
-          </Button>
-        </form>
-        {nameDone && <p className="mt-3 text-sm text-emerald-600">Name updated ✅</p>}
-      </Card>
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <p className="text-sm text-accent">{nameDone ? 'Name updated ✓' : ''}</p>
+              <Button type="submit" loading={nameSaving}>
+                Save name
+              </Button>
+            </div>
+          </form>
+        </section>
 
-      {/* Password */}
-      <Card className="mt-6 p-6">
-        <h2 className="text-lg font-bold text-slate-900">Change password</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Choose a strong password you haven't used before.
-        </p>
-        <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
-          <Input
-            label="Current password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => {
-              setCurrentPassword(e.target.value)
-              setPwDone(false)
-            }}
-            autoComplete="current-password"
-            required
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="New password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => {
-                setNewPassword(e.target.value)
-                setPwDone(false)
-              }}
-              hint="At least 8 characters"
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-            <Input
-              label="Confirm new password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value)
-                setPwDone(false)
-              }}
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
+        <div aria-hidden="true" className="divider my-9" />
+
+        {/* ---- Security ---- */}
+        <section>
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <KeyRound size={19} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-normal tracking-tight text-text">
+                Security
+              </h2>
+              <p className="mt-0.5 text-sm text-muted">
+                Choose a strong password you haven't used before.
+              </p>
+            </div>
           </div>
-          {pwError && (
-            <p role="alert" className="text-sm text-rose-600">
-              {pwError}
-            </p>
-          )}
-          {pwDone && <p className="text-sm text-emerald-600">Password updated ✅</p>}
-          <Button
-            type="submit"
-            loading={pwSaving}
-            disabled={!currentPassword || !newPassword || !confirmPassword}
-          >
-            Update password
-          </Button>
-        </form>
-      </Card>
+          <form onSubmit={handlePasswordSubmit} className="mt-6 space-y-5">
+            <Input
+              label="Current password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => {
+                setCurrentPassword(e.target.value)
+                setPwDone(false)
+              }}
+              autoComplete="current-password"
+              required
+            />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Input
+                label="New password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value)
+                  setPwDone(false)
+                }}
+                hint="At least 8 characters"
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+              <Input
+                label="Confirm new password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  setPwDone(false)
+                }}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </div>
+            {pwError && (
+              <p role="alert" className="text-sm text-error">
+                {pwError}
+              </p>
+            )}
+            {pwDone && <p className="text-sm text-accent">Password updated ✓</p>}
+            <Button
+              type="submit"
+              loading={pwSaving}
+              disabled={!currentPassword || !newPassword || !confirmPassword}
+            >
+              Update password
+            </Button>
+          </form>
+        </section>
+      </div>
     </main>
   )
 }

@@ -14,7 +14,7 @@ export interface StoredAuth {
   user: StoredUser
 }
 
-const AUTH_KEY = 'ai_trip_planner_auth'
+const AUTH_KEY = 'wayfinder_ai_auth'
 
 /** Reads the persisted session, returning null when absent or malformed. */
 export function loadAuth(): StoredAuth | null {

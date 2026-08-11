@@ -31,8 +31,7 @@ public class OsmPlacesClient implements PlacesService {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public OsmPlacesClient(@Value("${places.nominatim.base-url:https://nominatim.openstreetmap.org}") String baseUrl,
-                           @Value("${places.nominatim.user-agent:AI-Trip-Planner/0.1}") String userAgent,
+    public OsmPlacesClient(@Value("${places.nominatim.base-url:https://nominatim.openstreetmap.org}") String baseUrl,                            @Value("${places.nominatim.user-agent:Wayfinder-AI/0.1}") String userAgent,
                            ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

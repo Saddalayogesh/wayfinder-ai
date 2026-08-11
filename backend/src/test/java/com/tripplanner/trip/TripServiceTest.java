@@ -195,6 +195,42 @@ class TripServiceTest {
         verify(tripRepository, never()).findAll();
     }
 
+    // --- Currency ------------------------------------------------------------------
+
+    @Test
+    void persistGeneratedItinerary_usesRequestCurrency_orDefaultsToUsd() {
+        when(tripRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        GenerateTripRequest eur = new GenerateTripRequest("Somewhere",
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 1),
+                2, new BigDecimal("500"), "RELAXED", List.of(), "eur");
+        GeneratedItinerary itinerary = new GeneratedItinerary("Somewhere", List.of(
+                new GeneratedDay(1, List.of(new GeneratedActivity(
+                        "Place", 60, new BigDecimal("5"), null, null)))));
+
+        TripResponse fromRequest = tripService.persistGeneratedItinerary(USER_A, eur, itinerary);
+        assertEquals("EUR", fromRequest.currency());
+
+        GenerateTripRequest noCurrency = new GenerateTripRequest("Somewhere",
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 1),
+                2, new BigDecimal("500"), "RELAXED", List.of());
+        TripResponse defaulted = tripService.persistGeneratedItinerary(USER_A, noCurrency, itinerary);
+        assertEquals("USD", defaulted.currency());
+    }
+
+    @Test
+    void createTrip_setsCurrencyFromRequest() {
+        when(tripRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TripRequest inr = new TripRequest("Title", "Destination",
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5),
+                2, new BigDecimal("1000"), "RELAXED", List.of(), null, "INR");
+
+        TripResponse response = tripService.createTrip(USER_A, inr);
+
+        assertEquals("INR", response.currency());
+    }
+
     // --- Day regeneration -------------------------------------------------------
 
     /**

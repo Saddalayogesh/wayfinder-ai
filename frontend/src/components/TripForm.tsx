@@ -1,11 +1,15 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { getErrorMessage } from '../services/api'
 import {
+  CURRENCIES,
+  currencySymbol,
   TRAVEL_INTERESTS,
   TRAVEL_STYLES,
   type Trip,
   type TripInput,
 } from '../services/tripService'
+import DatePicker from './common/DatePicker'
+import { Check, ChevronDown, Minus, Plus, Sparkles } from 'lucide-react'
 
 interface TripFormProps {
   /** When provided, the form is pre-filled (edit mode). */
@@ -16,25 +20,48 @@ interface TripFormProps {
   onGenerate?: (input: TripInput) => Promise<void>
   /** True while an AI generation is in flight (disables all buttons). */
   generating?: boolean
+  /** Live draft mirror for parent previews — fired whenever a field changes. */
+  onDraftChange?: (draft: {
+    destination: string
+    startDate: string
+    endDate: string
+    travelers: string
+    budget: string
+    currency: string
+    travelStyle: string
+    interests: string[]
+  }) => void
 }
 
-const inputClass =
-  'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200'
+/** Field label — 13px, muted, letterspaced, sits 8px above the input. */
+const labelClass = 'block text-[13px] font-medium tracking-[0.02em] text-muted'
 
-const labelClass = 'mt-4 block text-sm font-medium text-slate-700'
-
-export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, generating }: TripFormProps) {
+export default function TripForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  onGenerate,
+  generating,
+  onDraftChange,
+}: TripFormProps) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [destination, setDestination] = useState(initial?.destination ?? '')
   const [startDate, setStartDate] = useState(initial?.startDate ?? '')
   const [endDate, setEndDate] = useState(initial?.endDate ?? '')
   const [travelers, setTravelers] = useState(initial?.travelers?.toString() ?? '1')
   const [budget, setBudget] = useState(initial?.budget?.toString() ?? '')
+  const [currency, setCurrency] = useState(initial?.currency ?? 'USD')
   const [travelStyle, setTravelStyle] = useState(initial?.travelStyle ?? TRAVEL_STYLES[0])
   const [interests, setInterests] = useState<string[]>(initial?.interests ?? [])
 
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Report the live draft to any parent preview (Create Trip page) — this is
+  // read-only for the parent; all state stays here in the form.
+  useEffect(() => {
+    onDraftChange?.({ destination, startDate, endDate, travelers, budget, currency, travelStyle, interests })
+  }, [destination, startDate, endDate, travelers, budget, currency, travelStyle, interests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleInterest = (interest: string) => {
     setInterests((current) =>
@@ -42,6 +69,13 @@ export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, g
         ? current.filter((i) => i !== interest)
         : [...current, interest],
     )
+  }
+
+  const adjustTravelers = (delta: number) => {
+    setTravelers((current) => {
+      const next = Math.max(1, (Number(current) || 1) + delta)
+      return String(next)
+    })
   }
 
   const buildInput = (): TripInput | null => {
@@ -75,6 +109,7 @@ export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, g
       endDate,
       travelers: travelersNum,
       budget: budgetNum,
+      currency,
       travelStyle,
       interests,
     }
@@ -111,121 +146,183 @@ export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, g
       {error && (
         <div
           role="alert"
-          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          className="mb-6 rounded-xl border border-error/25 bg-error/10 px-4 py-3 text-sm text-error"
         >
           {error}
         </div>
       )}
 
-      <label className={labelClass} htmlFor="title">
-        Title <span className="font-normal text-slate-400">(optional — defaults to “Trip to {destination}”)</span>
-      </label>
-      <input
-        id="title"
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className={inputClass}
-        placeholder="Summer in Japan"
-      />
+      {/* ---- Destination ---- */}
+      <section>
+        <label className={labelClass} htmlFor="title">
+          Title <span className="font-normal text-muted/70">(optional)</span>
+        </label>
+        <input
+          id="title"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="input mt-2"
+          placeholder="Summer in Japan"
+        />
 
-      <label className={labelClass} htmlFor="destination">
-        Destination
-      </label>
-      <input
-        id="destination"
-        type="text"
-        required
-        value={destination}
-        onChange={(e) => setDestination(e.target.value)}
-        className={inputClass}
-        placeholder="Tokyo"
-      />
+        <label className={labelClass} htmlFor="destination">
+          Destination
+        </label>
+        <input
+          id="destination"
+          type="text"
+          required
+          value={destination}
+          onChange={(e) => setDestination(e.target.value)}
+          className="input mt-2"
+          placeholder="Tokyo"
+        />
+      </section>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelClass} htmlFor="startDate">
-            Start date
-          </label>
-          <input
+      <div aria-hidden="true" className="divider mt-8" />
+
+      {/* ---- Dates ---- */}
+      <section className="mt-8">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <DatePicker
             id="startDate"
-            type="date"
-            required
+            label="Start date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className={inputClass}
+            onChange={setStartDate}
           />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="endDate">
-            End date
-          </label>
-          <input
+          <DatePicker
             id="endDate"
-            type="date"
-            required
+            label="End date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className={inputClass}
+            onChange={setEndDate}
+            minDate={startDate || undefined}
           />
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <label className={labelClass} htmlFor="travelers">
-            Travelers
-          </label>
-          <input
-            id="travelers"
-            type="number"
-            min={1}
-            required
-            value={travelers}
-            onChange={(e) => setTravelers(e.target.value)}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="budget">
-            Budget (USD)
-          </label>
-          <input
-            id="budget"
-            type="number"
-            min={0.01}
-            step={0.01}
-            required
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            className={inputClass}
-            placeholder="3500.00"
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="travelStyle">
-            Travel style
-          </label>
-          <select
-            id="travelStyle"
-            value={travelStyle}
-            onChange={(e) => setTravelStyle(e.target.value)}
-            className={inputClass}
-          >
-            {TRAVEL_STYLES.map((style) => (
-              <option key={style} value={style}>
-                {style.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <div aria-hidden="true" className="divider mt-8" />
 
-      <fieldset className="mt-5">
-        <legend className="text-sm font-medium text-slate-700">
-          Interests <span className="font-normal text-slate-400">(multi-select)</span>
+      {/* ---- Travelers / Budget / Currency / Style ---- */}
+      <section className="mt-8">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div role="group" aria-labelledby="travelers-label">
+            <span id="travelers-label" className={labelClass}>
+              Travelers
+            </span>
+            <div className="mt-2 flex items-center overflow-hidden rounded-[10px] border border-border bg-surface-hover transition-colors duration-200 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgb(var(--color-primary)_/_0.15)]">
+              <button
+                type="button"
+                onClick={() => adjustTravelers(-1)}
+                disabled={disabled}
+                aria-label="Decrease travelers"
+                className="flex h-12 w-11 shrink-0 items-center justify-center text-muted transition-colors duration-200 hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50 disabled:opacity-40"
+              >
+                <Minus size={15} aria-hidden="true" />
+              </button>
+              <span
+                aria-live="polite"
+                className="flex-1 text-center text-sm font-semibold text-text"
+              >
+                {travelers || '1'}
+              </span>
+              <button
+                type="button"
+                onClick={() => adjustTravelers(1)}
+                disabled={disabled}
+                aria-label="Increase travelers"
+                className="flex h-12 w-11 shrink-0 items-center justify-center text-muted transition-colors duration-200 hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50 disabled:opacity-40"
+              >
+                <Plus size={15} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="budget">
+              Budget
+            </label>
+            <div className="relative mt-2">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-muted"
+              >
+                {currencySymbol(currency)}
+              </span>
+              <input
+                id="budget"
+                type="number"
+                min={0.01}
+                step={0.01}
+                required
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className="input pl-9"
+                placeholder="3500.00"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="currency">
+              Currency
+            </label>
+            <div className="relative mt-2">
+              <select
+                id="currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="input pr-10"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} ({c.symbol})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="travelStyle">
+              Travel style
+            </label>
+            <div className="relative mt-2">
+              <select
+                id="travelStyle"
+                value={travelStyle}
+                onChange={(e) => setTravelStyle(e.target.value)}
+                className="input pr-10"
+              >
+                {TRAVEL_STYLES.map((style) => (
+                  <option key={style} value={style}>
+                    {style.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div aria-hidden="true" className="divider mt-8" />
+
+      {/* ---- Interests ---- */}
+      <fieldset className="mt-8">
+        <legend className={labelClass}>
+          Interests <span className="font-normal text-muted/70">(multi-select)</span>
         </legend>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2.5">
           {TRAVEL_INTERESTS.map((interest) => {
             const selected = interests.includes(interest)
             return (
@@ -234,12 +331,13 @@ export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, g
                 type="button"
                 onClick={() => toggleInterest(interest)}
                 aria-pressed={selected}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   selected
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
-                    : 'border-slate-300 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
+                    ? 'border-primary bg-primary/15 text-primary'
+                    : 'border-border bg-transparent text-muted hover:border-primary/40 hover:bg-surface-hover/60 hover:text-text'
                 }`}
               >
+                {selected && <Check size={13} aria-hidden="true" strokeWidth={2.5} />}
                 {interest}
               </button>
             )
@@ -247,24 +345,26 @@ export default function TripForm({ initial, submitLabel, onSubmit, onGenerate, g
         </div>
       </fieldset>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      {/* ---- Actions ---- */}
+      <div className="mt-9 flex flex-col gap-3 sm:flex-row">
         {onGenerate && (
           <button
             type="button"
             onClick={handleGenerate}
             disabled={disabled}
-            className="flex-1 rounded-lg bg-gradient-to-r from-indigo-600 to-sky-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:from-indigo-700 hover:to-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl btn-primary-bg py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all duration-200  hover:shadow-primary/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
-            {generating ? 'Generating…' : '✨ Generate My Trip'}
+            <Sparkles size={16} aria-hidden="true" />
+            {generating ? 'Generating…' : 'Generate my trip'}
           </button>
         )}
         <button
           type="submit"
           disabled={disabled}
-          className={`rounded-lg py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`inline-flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50 ${
             onGenerate
-              ? 'flex-1 border border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-              : 'w-full bg-indigo-600 text-white hover:bg-indigo-700'
+              ? 'flex-1 border border-border bg-transparent text-muted hover:border-primary/40 hover:text-primary'
+              : 'w-full btn-primary-bg text-white shadow-lg shadow-primary/25  hover:shadow-primary/40'
           }`}
         >
           {submitting ? 'Saving…' : submitLabel}

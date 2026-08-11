@@ -93,6 +93,7 @@ public class TripService {
         Trip trip = new Trip(userId, request.title().trim(), request.destination().trim(),
                 request.startDate(), request.endDate(), request.travelers(), request.budget(),
                 request.travelStyle().trim());
+        trip.setCurrency(normalizeCurrency(request.currency()));
         trip.setInterests(sanitizeInterests(request.interests()));
         replaceDays(trip, request.days());
         return TripResponse.from(tripRepository.save(trip));
@@ -107,6 +108,7 @@ public class TripService {
         trip.setEndDate(request.endDate());
         trip.setTravelers(request.travelers());
         trip.setBudget(request.budget());
+        trip.setCurrency(normalizeCurrency(request.currency()));
         trip.setTravelStyle(request.travelStyle().trim());
         trip.setInterests(sanitizeInterests(request.interests()));
         // days == null keeps existing days; [] removes them; a list replaces them
@@ -161,6 +163,7 @@ public class TripService {
         Trip trip = new Trip(userId, "AI itinerary for " + destination,
                 destination, request.startDate(), request.endDate(),
                 request.travelers(), request.budget(), request.travelStyle().trim());
+        trip.setCurrency(normalizeCurrency(request.currency()));
         trip.setInterests(sanitizeInterests(request.interests()));
 
         Map<Integer, List<GeneratedActivity>> activitiesByDay = itinerary.days().stream()
@@ -210,8 +213,8 @@ public class TripService {
                             + (isTarget ? " [THIS IS THE DAY BEING REGENERATED]" : "");
                 })
                 .collect(Collectors.joining(" | "));
-        return new RegenerateContext(trip.getDestination(), trip.getBudget(), trip.getTravelStyle(),
-                Set.copyOf(trip.getInterests()), summary);
+        return new RegenerateContext(trip.getDestination(), trip.getCurrency(), trip.getBudget(),
+                trip.getTravelStyle(), Set.copyOf(trip.getInterests()), summary);
     }
 
     /**
@@ -374,6 +377,14 @@ public class TripService {
         return new ItineraryItem(request.placeName().trim(), request.description(),
                 request.latitude(), request.longitude(), request.estimatedCost(),
                 request.visitDuration(), sequenceOrder);
+    }
+
+    /** Normalizes a currency code: blank -> USD, otherwise trimmed uppercase. */
+    private static String normalizeCurrency(String currency) {
+        if (currency == null || currency.isBlank()) {
+            return "USD";
+        }
+        return currency.trim().toUpperCase();
     }
 
     private Set<String> sanitizeInterests(List<String> interests) {

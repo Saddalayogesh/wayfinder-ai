@@ -66,7 +66,7 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('email')).toHaveTextContent('ada@example.com')
     expect(screen.getByTestId('token')).toHaveTextContent('jwt.test-token')
     expect(mockLogin).toHaveBeenCalledWith('ada@example.com', 'password123')
-    expect(localStorage.getItem('ai_trip_planner_auth')).toContain('jwt.test-token')
+    expect(localStorage.getItem('wayfinder_ai_auth')).toContain('jwt.test-token')
 
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
@@ -75,7 +75,7 @@ describe('AuthContext', () => {
     )
     expect(screen.getByTestId('email')).toHaveTextContent('signed-out')
     expect(screen.getByTestId('token')).toHaveTextContent('no-token')
-    expect(localStorage.getItem('ai_trip_planner_auth')).toBeNull()
+    expect(localStorage.getItem('wayfinder_ai_auth')).toBeNull()
   })
 
   it('login failure does not mark the user as authenticated', async () => {

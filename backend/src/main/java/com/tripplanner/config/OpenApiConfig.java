@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI / Swagger setup for the AI Trip Planner API.
+ * OpenAPI / Swagger setup for the Wayfinder AI API.
  *
  * <p>The JWT bearer security scheme is pre-registered (even though
  * authentication does not exist yet) so that later phases can just annotate
@@ -27,12 +27,12 @@ public class OpenApiConfig {
     private static final String SECURITY_SCHEME_NAME = "bearerAuth";
 
     @Bean
-    public OpenAPI aiTripPlannerOpenAPI() {
+    public OpenAPI wayfinderOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("AI Trip Planner API")
+                        .title("Wayfinder AI API")
                         .description("""
-                                Backend API for the AI Trip Planner monolith.
+                                Backend API for the Wayfinder AI monolith.
 
                                 Authentication is JWT bearer-based. Register or sign in via
                                 POST /api/auth/register or POST /api/auth/login, copy the

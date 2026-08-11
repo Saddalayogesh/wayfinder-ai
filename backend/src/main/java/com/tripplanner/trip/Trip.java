@@ -63,6 +63,10 @@ public class Trip {
     @Column(nullable = false, length = 50)
     private String travelStyle;
 
+    /** ISO-4217 currency code for all costs and the budget (defaults to USD). */
+    @Column(length = 10)
+    private String currency = "USD";
+
     /**
      * Random, non-guessable token enabling read-only access via
      * {@code GET /api/shared/trips/{token}} without authentication. Null until
@@ -171,6 +175,15 @@ public class Trip {
 
     public void setTravelStyle(String travelStyle) {
         this.travelStyle = travelStyle;
+    }
+
+    /** Null-safe: legacy rows without a currency read as USD. */
+    public String getCurrency() {
+        return currency == null ? "USD" : currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public String getShareToken() {

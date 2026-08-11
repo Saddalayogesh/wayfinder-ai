@@ -32,7 +32,7 @@ class OsmPlacesClientTest {
         server.start();
         client = new OsmPlacesClient(
                 "http://127.0.0.1:" + server.getAddress().getPort(),
-                "ai-trip-planner-test/1.0",
+                "wayfinder-ai-test/1.0",
                 new ObjectMapper());
     }
 

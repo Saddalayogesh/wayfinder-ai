@@ -42,6 +42,8 @@ export interface Trip {
   endDate: string
   travelers: number
   budget: number
+  /** ISO-4217 currency code for all costs (defaults to USD). */
+  currency: string
   travelStyle: string
   interests: string[]
   days: TripDay[]
@@ -73,9 +75,35 @@ export interface TripInput {
   endDate: string
   travelers: number
   budget: number
+  /** ISO-4217 currency code for costs and the budget (defaults to USD). */
+  currency: string
   travelStyle: string
   interests?: string[]
   days?: TripDayInput[]
+}
+
+/** Currencies offered in the trip form (symbols are display hints; Intl formats precisely). */
+export const CURRENCIES = [
+  { code: 'USD', label: 'US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'Euro', symbol: '€' },
+  { code: 'GBP', label: 'British Pound', symbol: '£' },
+  { code: 'INR', label: 'Indian Rupee', symbol: '₹' },
+  { code: 'JPY', label: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', label: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', label: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'CHF', label: 'Swiss Franc', symbol: 'Fr' },
+  { code: 'AED', label: 'UAE Dirham', symbol: 'د.إ' },
+  { code: 'SGD', label: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'THB', label: 'Thai Baht', symbol: '฿' },
+  { code: 'MXN', label: 'Mexican Peso', symbol: 'MX$' },
+  { code: 'BRL', label: 'Brazilian Real', symbol: 'R$' },
+  { code: 'ZAR', label: 'South African Rand', symbol: 'R' },
+  { code: 'KRW', label: 'South Korean Won', symbol: '₩' },
+  { code: 'CNY', label: 'Chinese Yuan', symbol: '¥' },
+] as const
+
+export function currencySymbol(code: string): string {
+  return CURRENCIES.find((c) => c.code === code)?.symbol ?? ''
 }
 
 export const TRAVEL_STYLES = [
@@ -121,6 +149,7 @@ export async function generateTrip(input: TripInput): Promise<Trip> {
     endDate: input.endDate,
     travelers: input.travelers,
     budget: input.budget,
+    currency: input.currency,
     travelStyle: input.travelStyle,
     interests: input.interests ?? [],
   })
@@ -227,11 +256,11 @@ export function formatDate(iso: string): string {
   })
 }
 
-/** Formats a budget value as USD-style currency. */
-export function formatCurrency(value: number): string {
+/** Formats a value as currency, defaulting to USD. */
+export function formatCurrency(value: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: 'USD',
+    currency,
     maximumFractionDigits: value % 1 === 0 ? 0 : 2,
   }).format(value)
 }

@@ -3,10 +3,10 @@ server:
 
 spring:
   application:
-    name: ai-trip-planner
+    name: wayfinder-ai
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_trip_planner?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/wayfinder_ai?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}
     # Local development default only — override via DB_PASSWORD (or better,
     # an environment variable / secret manager) in production.
@@ -60,7 +60,7 @@ places:
   provider: ${PLACES_PROVIDER:osm}
   nominatim:
     base-url: ${NOMINATIM_BASE_URL:https://nominatim.openstreetmap.org}
-    user-agent: ${NOMINATIM_USER_AGENT:AI-Trip-Planner/0.1}
+    user-agent: ${NOMINATIM_USER_AGENT:Wayfinder-AI/0.1}
 
 google:
   places:

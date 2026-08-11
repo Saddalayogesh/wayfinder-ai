@@ -1,0 +1,46 @@
+# Wayfinder AI — Render blueprint (free tier, no credit card needed).
+#
+# Deploys the single monolith Docker image: the React SPA is embedded in the
+# Spring Boot JAR (see Dockerfile), so ONE web service serves the whole app.
+#
+# To deploy:
+#   1. Sign up at https://render.com (no payment card required).
+#   2. In the dashboard: New -> Blueprint, pick this repo. Render reads this
+#      render.yaml and pre-fills the service, Docker build, and env vars.
+#   3. Fill the three secrets (DB_PASSWORD, JWT_SECRET, GEMINI_API_KEY) in the
+#      Render dashboard — they are marked sync: false on purpose so their
+#      values are never committed to git.
+#   4. Apply the blueprint and deploy. Render's health check polls /api/health.
+
+services:
+  - type: web
+    name: wayfinder-ai
+    runtime: docker
+    repo: https://github.com/Saddalayogesh/wayfinder-ai
+    # Deploys from the dev branch (the repo's active development branch).
+    branch: dev
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # TiDB Cloud Starter (free, MySQL-compatible). If you named the database
+      # something else than wayfinder_ai, change the path in DB_URL.
+      - key: DB_URL
+        value: jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/wayfinder_ai?sslMode=VERIFY_IDENTITY
+      - key: DB_USERNAME
+        value: X7W6GvU1516JVT5.root
+      # ---------- secrets: set in the Render dashboard, not in git ----------
+      - key: DB_PASSWORD
+        sync: false
+      # Generate a strong value with: openssl rand -base64 48
+      - key: JWT_SECRET
+        sync: false
+      # Free API key from https://aistudio.google.com/apikey
+      - key: GEMINI_API_KEY
+        sync: false
+      # In-memory cache — no Redis needed on the free plan.
+      - key: CACHE_TYPE
+        value: simple
+      # Free OpenStreetMap places provider — no API key required.
+      - key: PLACES_PROVIDER
+        value: osm

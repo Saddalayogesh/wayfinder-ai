@@ -71,7 +71,7 @@ Tell Wayfinder AI where you want to go and what you love to do, and it designs a
 | **Maps** | Leaflet + CARTO dark tiles · custom markers & styled popups |
 | **PDF** | OpenPDF 3.x (LGPL/MPL fork of iText) |
 | **Build** | Maven `frontend-maven-plugin` (SPA embedded into the JAR) |
-| **DevOps** | Multi-stage Dockerfile · docker-compose · GitHub Actions · GHCR |
+| **DevOps** | Multi-stage Dockerfile · docker-compose · GitHub Actions · GHCR · Render blueprint · TiDB Cloud Starter |
 | **Testing** | JUnit 5 · Mockito · MockMvc · H2 · JaCoCo · Vitest · React Testing Library |
 
 ---
@@ -210,6 +210,7 @@ All values are environment-overridable — see `backend/src/main/resources/appli
 │       └── services/                 # typed API clients (axios)
 ├── Dockerfile                        # multi-stage: node → maven → slim JRE
 ├── docker-compose.yml                # mysql + redis + one app container
+├── render.yaml                       # Render blueprint (free-tier cloud deploy)
 ├── .env.example                      # copy to .env, fill in values
 └── .github/workflows/ci-cd.yml       # test → package → docker image → GHCR
 ```
@@ -285,6 +286,38 @@ Reports: JaCoCo → `backend/target/site/jacoco/index.html`.
 
 ## 🚢 Deployment
 
+### Free cloud deploy — Render + TiDB Cloud Starter
+
+The whole app ships as **one Docker container**, so there is no separate frontend to host. The entire stack runs on **free tiers with no credit card**:
+
+| Piece | Service | Free tier |
+| --- | --- | --- |
+| App (SPA + API) | [Render](https://render.com) web service (Docker) | ✅ 750 h/month — sleeps after 15 min idle |
+| Database | [TiDB Cloud Starter](https://tidbcloud.com) (MySQL-compatible) | ✅ 5 GiB + 50M RUs/month, no card |
+| Cache | not needed — in-memory `CACHE_TYPE=simple` | — |
+| AI | Google Gemini | free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+
+**Deploy steps**
+
+1. In **TiDB Cloud Starter**, create a cluster and run `CREATE DATABASE wayfinder_ai;` (JDBC host: `gateway01.<region>.prod.aws.tidbcloud.com:4000`, username `<prefix>.root`, TLS required via `sslMode=VERIFY_IDENTITY`).
+2. `render.yaml` (repo root) is a Render Blueprint — in the Render dashboard: **New → Blueprint** → select this repo → **Apply**. It pre-fills the Docker build, `/api/health` health check, and non-secret env vars.
+3. Set the three **secrets** in the Render dashboard (marked `sync: false` in the blueprint so they never touch git): `DB_PASSWORD`, `JWT_SECRET`, `GEMINI_API_KEY`.
+4. Deploy and open `https://<service-name>.onrender.com` — the health check polls `/api/health`.
+
+**Environment variables** (see `render.yaml`):
+
+| Variable | Value |
+| --- | --- |
+| `DB_URL` | `jdbc:mysql://<tidb-host>:4000/wayfinder_ai?sslMode=VERIFY_IDENTITY` |
+| `DB_USERNAME` | `<prefix>.root` (from the TiDB Connect panel) |
+| `DB_PASSWORD` | your TiDB password (secret) |
+| `JWT_SECRET` | long random string ≥ 256 bits (secret — `openssl rand -base64 48`) |
+| `GEMINI_API_KEY` | free Google AI Studio key (secret) |
+| `CACHE_TYPE` | `simple` — no Redis required on the free plan |
+| `PLACES_PROVIDER` | `osm` — free OpenStreetMap, no API key |
+
+> ⚠️ Free-tier Render instances **spin down after 15 minutes of inactivity** and take ~1 minute to cold-start on the next request — ideal for demos, not for always-on traffic.
+
 ### CI/CD pipeline
 
 `.github/workflows/ci-cd.yml` runs on push/PR to `main` and `develop` (stale runs auto-cancel):
@@ -295,7 +328,7 @@ Reports: JaCoCo → `backend/target/site/jacoco/index.html`.
 4. JAR packaging with the SPA embedded
 5. `docker compose config` validation
 6. Docker image build (multi-stage: node → maven → JRE)
-7. On `main` only — push image to **GHCR** (`latest` + commit SHA)
+7. On `main` only — push image to **GHCR** (`ghcr.io/saddalayogesh/wayfinder-ai:latest` + commit SHA — repo names are lowercased because GHCR requires it)
 
 ### Production JAR
 
@@ -342,6 +375,7 @@ Contributions are welcome! Here's how to get involved:
 | 08 | Frontend polish — premium dark design system |
 | 09 | Comprehensive backend & frontend test suites |
 | 10 | Sharing, PDF export, Docker and CI/CD hardening |
+| 11 | Free cloud deployment — Render blueprint + TiDB Cloud Starter |
 
 </details>
 

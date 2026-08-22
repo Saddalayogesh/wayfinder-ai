@@ -6,10 +6,10 @@
 
 [![Build Status](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF.svg)](.github/workflows/ci-cd.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](#-tech-stack)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](#-tech-stack)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-green.svg)](#-tech-stack)
 [![Node](https://img.shields.io/badge/Node-22-green.svg)](#-tech-stack)
-[![React](https://img.shields.io/badge/React-18-61dafb.svg)](#-tech-stack)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](#-tech-stack)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6.svg)](#-tech-stack)
 
 **[Overview](#-overview) · [Features](#-features) · [Screenshots](#-screenshots) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [API Docs](#-api-documentation) · [Testing](#-testing) · [Deployment](#-deployment) · [Contributing](#-contributing) · [License](#-license)**
@@ -75,9 +75,9 @@ Tell Wayfinder AI where you want to go and what you love to do, and it designs a
 
 | Layer | Technology |
 | --- | --- |
-| **Backend** | Java 21 · Spring Boot 3.5 · Spring Security + JJWT 0.12 · Spring Data JPA · MySQL · springdoc-openapi |
+| **Backend** | Java 25 · Spring Boot 3.5 · Spring Security + JJWT 0.12 · Spring Data JPA · MySQL · springdoc-openapi |
 | **AI** | Google Gemini (Generative Language API) with defensive JSON parsing |
-| **Frontend** | React 18 · TypeScript 5.6 · Vite · Tailwind CSS · React Router v6 · Axios · Leaflet · Lucide |
+| **Frontend** | React 19 · TypeScript 5.6 · Vite · Tailwind CSS · React Router v6 · Axios · Leaflet · Lucide |
 | **Caching** | Spring Cache — Redis (`CACHE_TYPE=redis`) or in-memory (`simple`) |
 | **Maps** | Leaflet + CARTO dark tiles · custom markers & styled popups |
 | **PDF** | OpenPDF 3.x (LGPL/MPL fork of iText) |
@@ -89,7 +89,7 @@ Tell Wayfinder AI where you want to go and what you love to do, and it designs a
 
 ## 🏗️ Architecture
 
-A deliberate **monolith**: the React build is embedded in the Spring Boot JAR under `BOOT-INF/classes/static` and served by Spring Boot's static-resource handling. A `WebConfig` SPA fallback forwards every non-API, non-static path to `index.html`, so deep links like `/trips/7` survive hard refreshes.
+A deliberate **monolith**: the React build is embedded in the Spring Boot JAR under `BOOT-INF/classes/static` and served by Spring Boot's static-resource handling. A `WebConfig` SPA fallback filter forwards every non-API, non-static path to `index.html`, so deep links like `/trips/7` survive hard refreshes.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
@@ -122,7 +122,7 @@ A deliberate **monolith**: the React build is embedded in the Spring Boot JAR un
 | Tool | Version | Notes |
 | --- | --- | --- |
 | Docker + Compose | ≥ 2.x | **Recommended** path — nothing else needed |
-| JDK | 21+ | Local dev only |
+| JDK | 25+ | Local dev only |
 | Maven | 3.9+ | Local dev only |
 | Node.js | 22+ | Local dev only |
 
@@ -156,7 +156,7 @@ The Vite dev server proxies `/api/*` to the backend. The MySQL schema is created
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Vite dev server with HMR + `/api` proxy |
-| `npm test` | Vitest + React Testing Library (24 tests) |
+| `npm test` | Vitest + React Testing Library (28 tests) |
 | `npm run typecheck` | `tsc --noEmit` strict check |
 | `npm run build` | typecheck + production build to `dist/` |
 
@@ -165,7 +165,7 @@ The Vite dev server proxies `/api/*` to the backend. The MySQL schema is created
 | Command | What it does |
 | --- | --- |
 | `mvn spring-boot:run` | Run the API on :8080 |
-| `mvn test` | Full JUnit 5 + MockMvc suite (22 test classes, H2) |
+| `mvn test` | Full JUnit 5 + MockMvc suite (116 tests, H2) |
 | `mvn package` | Build the runnable JAR with the SPA embedded |
 
 ### Environment variables
@@ -279,10 +279,10 @@ All protected routes require `Authorization: Bearer <token>`. Every error uses o
 ## 🧪 Testing
 
 ```bash
-# Backend — 22 test classes (JUnit 5 + Mockito + MockMvc, in-memory H2)
+# Backend — 116 tests (JUnit 5 + Mockito + MockMvc, in-memory H2)
 cd backend && mvn test
 
-# Frontend — 7 test files / 24 tests (Vitest + React Testing Library)
+# Frontend — 8 test files / 28 tests (Vitest + React Testing Library)
 cd frontend && npm test
 ```
 
@@ -331,9 +331,9 @@ The whole app ships as **one Docker container**, so there is no separate fronten
 
 ### CI/CD pipeline
 
-`.github/workflows/ci-cd.yml` runs on push/PR to `main` and `develop` (stale runs auto-cancel):
+`.github/workflows/ci-cd.yml` runs on push/PR to `main`, `stage`, and `dev` (stale runs auto-cancel):
 
-1. Backend tests — `mvn -B test` (JDK 21, Temurin)
+1. Backend tests — `mvn -B test` (JDK 25, Temurin)
 2. Frontend tests — `npm ci && npm test` (Node 22)
 3. Frontend typecheck + production build — `tsc` + Vite
 4. JAR packaging with the SPA embedded
@@ -387,6 +387,7 @@ Contributions are welcome! Here's how to get involved:
 | 09 | Comprehensive backend & frontend test suites |
 | 10 | Sharing, PDF export, Docker and CI/CD hardening |
 | 11 | Free cloud deployment — Render blueprint + TiDB Cloud Starter |
+| 12 | Major version upgrade — Java 25, Spring Boot 3.5, React 19, Spring 6.2 compat fixes |
 
 </details>
 

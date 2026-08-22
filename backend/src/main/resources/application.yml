@@ -5,6 +5,12 @@ spring:
   application:
     name: wayfinder-ai
 
+  mvc:
+    pathmatch:
+      # springdoc-openapi uses PathPattern.combine() which is incompatible
+      # with the default PathPatternParser in Spring Framework 6.2+.
+      matching-strategy: ant_path_matcher
+
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/wayfinder_ai?createDatabaseIfNotExist=true&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}

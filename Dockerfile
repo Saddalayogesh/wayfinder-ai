@@ -19,7 +19,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- Stage 2: build the Spring Boot JAR -------------------------------
-FROM maven:3.9-eclipse-temurin-21 AS backend-build
+FROM maven:3.9-eclipse-temurin-25 AS backend-build
 WORKDIR /workspace
 COPY backend/pom.xml backend/pom.xml
 COPY backend/src backend/src
@@ -34,7 +34,7 @@ RUN cd backend && mvn -B package -Dmaven.test.skip=true \
     -Dskip.installnodenpm=true -Dskip.npm=true -Dskip.npx=true
 
 # ---------- Stage 3: slim runtime --------------------------------------------
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 WORKDIR /app
 # Install curl for the container healthcheck — the base JRE image ships no
 # HTTP client tool (neither curl nor wget), so add it explicitly.
